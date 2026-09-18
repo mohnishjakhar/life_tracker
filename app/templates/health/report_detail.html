@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }} – Lab Report Detail{% endblock %}
+{% block content %}
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1 small">
+                <li class="breadcrumb-item"><a href="{{ url_for('health.dashboard', tab='reports') }}">Health Hub</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Medical Report</li>
+            </ol>
+        </nav>
+        <h2 class="mb-0 fw-bold"><i class="bi bi-file-earmark-medical-fill text-primary"></i> {{ report.title }}</h2>
+        <p class="text-muted small mb-0">
+            Tested on <strong>{{ report.test_date.strftime('%B %d, %Y') }}</strong> at <strong>{{ report.lab_name or 'Diagnostic Center' }}</strong>
+            {% if report.doctor_name %} | Consulting Doctor: <strong>Dr. {{ report.doctor_name }}</strong>{% endif %}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if report.pdf_filename %}
+        <a href="{{ url_for('health.download_report_pdf', report_id=report.id) }}" target="_blank" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-file-pdf"></i> View / Download PDF
+        </a>
+        {% endif %}
+        <a href="{{ url_for('health.dashboard', tab='reports') }}" class="btn btn-outline-secondary btn-sm">
+            ← Back to Hub
+        </a>
+    </div>
+</div>
+
+<!-- Doctor Summary Notes (if any) -->
+{% if report.summary_notes %}
+<div class="card border-0 shadow-sm mb-4 bg-body-tertiary">
+    <div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-chat-left-text text-primary me-1"></i> Doctor / Lab Notes</h6>
+        <p class="mb-0 text-muted small">{{ report.summary_notes }}</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Diagnostic Panels -->
+<div class="row g-4">
+    {% for panel_name, tests in panels.items() %}
+    {% if tests %}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0 pt-3 pb-1">
+                <h5 class="fw-bold mb-0">
+                    {% if panel_name == 'CBC' %}🩸
+                    {% elif panel_name == 'Lipid Profile' %}🥑
+                    {% elif panel_name == 'Vitamins & Minerals' %}💊
+                    {% else %}🧪{% endif %}
+                    {{ panel_name }}
+                </h5>
+            </div>
+            <div class="card-body pt-2">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>Test Parameter</th>
+                                <th>Observed Value</th>
+                                <th>Reference Range</th>
+                                <th class="text-end">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in tests %}
+                            <tr>
+                                <td class="fw-bold">{{ t.name }}</td>
+                                <td>
+                                    <span class="fs-6 fw-bold text-{{ t.badge }}">{{ t.value }}</span>
+                                    <small class="text-muted">{{ t.unit }}</small>
+                                </td>
+                                <td class="small text-muted">{{ t.ref }}</td>
+                                <td class="text-end">
+                                    <span class="badge bg-{{ t.badge }}-subtle text-{{ t.badge }} lab-ref-badge">
+                                        {{ t.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- If no structured tests were filled -->
+    {% set total_tests = panels['CBC']|length + panels['Lipid Profile']|length + panels['Vitamins & Minerals']|length + panels['Metabolic & Organs']|length %}
+    {% if total_tests == 0 %}
+    <div class="col-12">
+        <div class="card border-0 shadow-sm text-center py-5 text-muted">
+            <i class="bi bi-file-earmark-medical display-4 opacity-25 d-block mb-3"></i>
+            <h5>No individual test parameters recorded</h5>
+            <p class="small">The PDF report is securely stored and available above.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Embedded PDF Preview or download bar -->
+{% if report.pdf_filename %}
+<div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3">
+        <h5 class="fw-bold mb-0"><i class="bi bi-file-pdf text-danger me-1"></i> Attached PDF Report: {{ report.original_filename or 'Report.pdf' }}</h5>
+        <a href="{{ url_for('health.download_report_pdf', report_id=report.id) }}" target="_blank" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-box-arrow-up-right"></i> Open in New Tab
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <iframe src="{{ url_for('health.download_report_pdf', report_id=report.id) }}" style="width: 100%; height: 600px; border: none;" title="Medical Report PDF"></iframe>
+    </div>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-end mt-4 mb-5">
+    <form action="{{ url_for('health.delete_report', report_id=report.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this report and its associated PDF?');">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash"></i> Delete Report Record
+        </button>
+    </form>
+</div>
+
+{% endblock %}

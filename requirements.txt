@@ -1,0 +1,7 @@
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+Flask-Login==0.6.3
+python-dotenv==1.0.1
+email-validator==2.2.0
+#C:\Users\mohnish jakhar\.gemini\antigravity-ide\brain\0f5d8c6f-2003-4d04-b006-6715a5b6a161\implementation_plan.md

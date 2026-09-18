@@ -1,0 +1,1660 @@
+{% extends "base.html" %}
+{% block title %}Health & Wellness Hub – Life Tracker{% endblock %}
+{% block content %}
+
+<!-- ═══════════════════════ HEADER & HERO STATS ═══════════════════════ -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="mb-0 fw-bold"><i class="bi bi-heart-pulse-fill text-danger"></i> Health & Wellness Hub</h2>
+            <span class="badge bg-danger-subtle text-danger px-2.5 py-1.5 rounded-pill small">Daily Vitality: {{ vitality_score }}%</span>
+        </div>
+        <p class="text-muted mb-0 small">{{ today.strftime('%A, %B %d, %Y') }} – Track workouts, nutrition, lab reports, and vitals.</p>
+    </div>
+    <!-- Quick action buttons -->
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#logWorkoutModal">
+            <i class="bi bi-activity"></i> Log Workout
+        </button>
+        <button class="btn btn-sm btn-warning text-dark" data-bs-toggle="modal" data-bs-target="#logMealModal">
+            <i class="bi bi-egg-fried"></i> Log Meal
+        </button>
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#logVitalsModal">
+            <i class="bi bi-speedometer2"></i> Record Vitals
+        </button>
+        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#logIssueModal">
+            <i class="bi bi-prescription2"></i> Doctor Visit / Issue
+        </button>
+        <button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#uploadReportModal">
+            <i class="bi bi-file-earmark-medical"></i> Lab Report
+        </button>
+    </div>
+</div>
+
+<!-- Active Health Alert if any issue is active -->
+{% if active_issues %}
+<div class="alert alert-warning border-0 shadow-sm d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-4">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-exclamation-octagon-fill fs-5 text-warning"></i>
+        <div>
+            <strong>Active Health Notice:</strong> {{ active_issues[0].title }} ({{ active_issues[0].severity }} – {{ active_issues[0].issue_type }})
+            {% if active_issues[0].doctor_visited and active_issues[0].doctor_name %}
+                | Visited: <strong>{{ active_issues[0].doctor_name }}</strong> ({{ active_issues[0].clinic_hospital or 'Clinic' }})
+            {% endif %}
+            {% if active_issues[0].follow_up_date %}
+                | <span class="badge bg-warning-subtle text-dark">Follow-up: {{ active_issues[0].follow_up_date.strftime('%b %d, %Y') }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <form action="{{ url_for('health.update_issue_status', issue_id=active_issues[0].id) }}" method="POST" class="m-0">
+        <input type="hidden" name="status" value="Resolved">
+        <button type="submit" class="btn btn-sm btn-outline-dark">Mark Resolved</button>
+    </form>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════ TOP SUMMARY CARDS ═══════════════════════ -->
+<div class="row g-3 mb-4">
+    <!-- Weekly Exercise Card -->
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 stat-card-accent">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small fw-bold text-uppercase">Weekly Workouts</span>
+                    <i class="bi bi-activity text-primary fs-5"></i>
+                </div>
+                <h3 class="fw-bold mb-1 text-primary">
+                    {{ workout_days_done }} <small class="text-muted fs-6 fw-normal">/ {{ exercise_target.target_days_per_week }} days</small>
+                </h3>
+                <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ exercise_days_pct }}%;"></div>
+                </div>
+                <div class="d-flex justify-content-between text-muted small">
+                    <span>{{ total_workout_mins }} / {{ exercise_target.target_minutes_per_week }} mins</span>
+                    <span>{{ total_workout_cals }} kcal</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diet & Calories Card -->
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 stat-card-accent accent-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small fw-bold text-uppercase">Today's Diet</span>
+                    <i class="bi bi-fire text-warning fs-5"></i>
+                </div>
+                <h3 class="fw-bold mb-1 text-warning">
+                    {{ today_calories|int }} <small class="text-muted fs-6 fw-normal">/ {{ diet_target.target_calories }} kcal</small>
+                </h3>
+                <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ cal_pct }}%;"></div>
+                </div>
+                <div class="d-flex justify-content-between text-muted small">
+                    <span>Protein: {{ today_protein|round(1) }}g / {{ diet_target.target_protein_g|int }}g</span>
+                    <span>Fiber: {{ today_fiber|round(1) }}g</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hydration & Sleep Card -->
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 stat-card-accent accent-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small fw-bold text-uppercase">Water & Sleep</span>
+                    <i class="bi bi-droplet-fill text-info fs-5"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <h3 class="fw-bold mb-0 text-info">
+                        {{ water_glasses }} <small class="text-muted fs-6 fw-normal">/ {{ water_target_glasses }} glasses</small>
+                    </h3>
+                    <!-- Quick Hydration +1 button -->
+                    <form action="{{ url_for('health.quick_hydration') }}" method="POST" class="d-inline m-0">
+                        <input type="hidden" name="amount_ml" value="250">
+                        <button type="submit" class="btn btn-sm btn-outline-info py-0 px-2" title="Drink 1 glass (+250ml)">
+                            +1 <i class="bi bi-cup-straw"></i>
+                        </button>
+                    </form>
+                </div>
+                <div class="progress mb-2" style="height: 6px;">
+                    <div class="progress-bar bg-info" role="progressbar" style="width: {{ water_pct }}%;"></div>
+                </div>
+                <div class="d-flex justify-content-between text-muted small">
+                    <span>{{ daily_health.water_ml }} ml</span>
+                    <span>Sleep: {{ daily_health.sleep_hours or 0 }}h ({{ daily_health.sleep_quality or 'Good' }})</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Body Vitals Card -->
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100 stat-card-accent accent-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted small fw-bold text-uppercase">Body Measurements</span>
+                    <i class="bi bi-speedometer2 text-success fs-5"></i>
+                </div>
+                {% if latest_vitals and latest_vitals.weight_kg %}
+                <div class="d-flex align-items-baseline gap-2 mb-1">
+                    <h3 class="fw-bold mb-0 text-success">{{ latest_vitals.weight_kg }} <small class="text-muted fs-6">kg</small></h3>
+                    {% if latest_vitals.bmi %}
+                    <span class="badge bg-{{ latest_vitals.bmi_category.badge }}-subtle text-{{ latest_vitals.bmi_category.badge }}">
+                        BMI {{ latest_vitals.bmi }}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="text-muted small mb-0">
+                    {% if latest_vitals.blood_pressure_systolic and latest_vitals.blood_pressure_diastolic %}
+                    <span>BP: {{ latest_vitals.blood_pressure_systolic }}/{{ latest_vitals.blood_pressure_diastolic }}</span>
+                    {% endif %}
+                    {% if latest_vitals.vision_right or latest_vitals.vision_left %}
+                    <span class="ms-1">| Eye: R {{ latest_vitals.vision_right or '-' }} / L {{ latest_vitals.vision_left or '-' }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-muted small mt-1">Recorded: {{ latest_vitals.date.strftime('%b %d') }}</div>
+                {% else %}
+                <p class="text-muted small mb-2">No vitals logged yet.</p>
+                <button class="btn btn-sm btn-outline-success py-0" data-bs-toggle="modal" data-bs-target="#logVitalsModal">Record Now</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════ NAVIGATION TABS ═══════════════════════ -->
+<ul class="nav nav-pills health-nav-tabs mb-4 p-1 bg-body-tertiary rounded-3 border" id="healthTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'overview' %}active{% endif %}" id="tab-overview-btn" data-bs-toggle="pill" data-bs-target="#tab-overview" type="button" role="tab">
+            <i class="bi bi-grid-1x2-fill me-1"></i> Overview
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'exercise' %}active{% endif %}" id="tab-exercise-btn" data-bs-toggle="pill" data-bs-target="#tab-exercise" type="button" role="tab">
+            <i class="bi bi-activity me-1"></i> Exercise & Fitness
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'diet' %}active{% endif %}" id="tab-diet-btn" data-bs-toggle="pill" data-bs-target="#tab-diet" type="button" role="tab">
+            <i class="bi bi-egg-fried me-1"></i> Diet & Nutrition
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'vitals' %}active{% endif %}" id="tab-vitals-btn" data-bs-toggle="pill" data-bs-target="#tab-vitals" type="button" role="tab">
+            <i class="bi bi-speedometer2 me-1"></i> Vitals & Measurements
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'reports' %}active{% endif %}" id="tab-reports-btn" data-bs-toggle="pill" data-bs-target="#tab-reports" type="button" role="tab">
+            <i class="bi bi-file-earmark-medical-fill me-1"></i> Medical Reports (PDF)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'issues' %}active{% endif %}" id="tab-issues-btn" data-bs-toggle="pill" data-bs-target="#tab-issues" type="button" role="tab">
+            <i class="bi bi-hospital me-1"></i> Health Issues & Doctor Visits
+        </button>
+    </li>
+</ul>
+
+<!-- ═══════════════════════ TAB CONTENTS ═══════════════════════ -->
+<div class="tab-content" id="healthTabsContent">
+
+    <!-- ─────────────────────── TAB 1: OVERVIEW ─────────────────────── -->
+    <div class="tab-pane fade {% if active_tab == 'overview' %}show active{% endif %}" id="tab-overview" role="tabpanel">
+        <div class="row g-4">
+            <!-- Left: Weekly Workouts & Today's Nutrition -->
+            <div class="col-lg-7">
+                <!-- Weekly Workout Progress -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-activity text-primary me-1"></i> This Week's Exercise Progress</h5>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#logWorkoutModal">+ Log Workout</button>
+                        </div>
+                        <div class="p-3 bg-body-tertiary rounded-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">Days Active Target</span>
+                                <span class="badge bg-primary">{{ workout_days_done }} / {{ exercise_target.target_days_per_week }} Days</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 10px;">
+                                <div class="progress-bar bg-primary" style="width: {{ exercise_days_pct }}%;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">Active Minutes Target</span>
+                                <span class="badge bg-info text-white">{{ total_workout_mins }} / {{ exercise_target.target_minutes_per_week }} Mins</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar bg-info" style="width: {{ exercise_mins_pct }}%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 7-day mini workout chart -->
+                        <p class="text-muted small fw-bold mb-1">Active Minutes (Current Week)</p>
+                        <div style="height: 140px; position: relative;">
+                            <canvas id="overviewWorkoutChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Today's Meals Quick List -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-egg-fried text-warning me-1"></i> Today's Meals</h5>
+                            <button class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#logMealModal">+ Add Meal</button>
+                        </div>
+                        {% if today_meals %}
+                        <div class="list-group list-group-flush">
+                            {% for m in today_meals %}
+                            <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-warning-subtle text-dark fw-bold me-2">{{ m.meal_type }}</span>
+                                    <span class="fw-semibold">{{ m.food_items }}</span>
+                                    {% if m.tags_list() %}
+                                    <div class="mt-1">
+                                        {% for tag in m.tags_list() %}
+                                        <span class="badge bg-secondary-subtle text-secondary small">{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    <span class="fw-bold">{{ m.calories|int }} kcal</span>
+                                    <div class="text-muted small">P: {{ m.protein_g|round(1) }}g | C: {{ m.carbs_g|round(1) }}g</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="text-center py-3 text-muted small">
+                            <i class="bi bi-cup-hot display-6 opacity-25 d-block mb-1"></i>
+                            No meals logged yet today. Click "+ Add Meal" to track your nutrition.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Hydration, Sleep, Vitals, Reports Quick Access -->
+            <div class="col-lg-5">
+                <!-- Interactive Hydration Widget -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-droplet-fill text-info me-1"></i> Hydration Counter</h5>
+                            <span class="badge bg-info-subtle text-info fw-bold">{{ daily_health.water_ml }} / {{ diet_target.target_water_ml }} ml</span>
+                        </div>
+                        <p class="text-muted small mb-2">Click on any glass to quickly log water intake (+250ml per glass):</p>
+                        <div class="d-flex flex-wrap gap-2 justify-content-center p-3 bg-body-tertiary rounded-3 mb-3">
+                            {% for i in range(1, 11) %}
+                            <form action="{{ url_for('health.quick_hydration') }}" method="POST" class="d-inline m-0">
+                                <input type="hidden" name="amount_ml" value="250">
+                                <button type="submit" class="border-0 bg-transparent p-0 water-glass-icon {% if i <= water_glasses %}water-glass-filled{% else %}water-glass-empty{% endif %}" title="Glass {{ i }} (250ml)">
+                                    <i class="bi {% if i <= water_glasses %}bi-droplet-fill{% else %}bi-droplet{% endif %}"></i>
+                                </button>
+                            </form>
+                            {% endfor %}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ water_glasses }} of {{ water_target_glasses }} glasses completed</small>
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#logSleepModal">
+                                <i class="bi bi-moon-stars"></i> Log Sleep
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Latest Body Vitals Summary -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-speedometer2 text-success me-1"></i> Vitals Snapshot</h5>
+                            <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#logVitalsModal">+ Update</button>
+                        </div>
+                        {% if latest_vitals %}
+                        <div class="row g-2 text-center">
+                            <div class="col-6 p-2 bg-body-tertiary rounded">
+                                <span class="text-muted small d-block">Weight</span>
+                                <strong class="fs-5">{{ latest_vitals.weight_kg or '-' }} kg</strong>
+                            </div>
+                            <div class="col-6 p-2 bg-body-tertiary rounded">
+                                <span class="text-muted small d-block">BMI</span>
+                                <strong class="fs-5 text-{{ latest_vitals.bmi_category.badge }}">{{ latest_vitals.bmi or '-' }}</strong>
+                            </div>
+                            <div class="col-6 p-2 bg-body-tertiary rounded">
+                                <span class="text-muted small d-block">Blood Pressure</span>
+                                <strong class="fs-6">{% if latest_vitals.blood_pressure_systolic %}{{ latest_vitals.blood_pressure_systolic }}/{{ latest_vitals.blood_pressure_diastolic }}{% else %}-{% endif %}</strong>
+                            </div>
+                            <div class="col-6 p-2 bg-body-tertiary rounded">
+                                <span class="text-muted small d-block">Vision (R / L)</span>
+                                <strong class="fs-6">{{ latest_vitals.vision_right or '-' }} / {{ latest_vitals.vision_left or '-' }}</strong>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0 text-center py-2">No body measurements recorded yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Recent Medical Lab Reports Summary -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-medical text-primary me-1"></i> Medical Reports</h5>
+                            <button class="btn btn-sm btn-outline-info text-white" data-bs-toggle="modal" data-bs-target="#uploadReportModal">+ Upload PDF</button>
+                        </div>
+                        {% if medical_reports %}
+                        <div class="list-group list-group-flush">
+                            {% for r in medical_reports[:3] %}
+                            <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <a href="{{ url_for('health.view_report_detail', report_id=r.id) }}" class="fw-bold text-decoration-none text-body">
+                                        {{ r.title }}
+                                    </a>
+                                    <div class="text-muted small">{{ r.lab_name or 'Lab' }} – {{ r.test_date.strftime('%b %d, %Y') }}</div>
+                                </div>
+                                <div>
+                                    {% if r.pdf_filename %}
+                                    <a href="{{ url_for('health.download_report_pdf', report_id=r.id) }}" target="_blank" class="btn btn-sm btn-outline-danger py-0 px-2" title="View attached PDF">
+                                        <i class="bi bi-file-pdf"></i> PDF
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0 text-center py-2">No lab reports uploaded yet. Keep all test results organized here.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────── TAB 2: EXERCISE & FITNESS ─────────────────────── -->
+    <div class="tab-pane fade {% if active_tab == 'exercise' %}show active{% endif %}" id="tab-exercise" role="tabpanel">
+        <div class="row g-4">
+            <!-- Weekly Target Setting & Progress -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0">🎯 Weekly Target</h5>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#setExerciseTargetModal">Edit Target</button>
+                        </div>
+                        <ul class="list-unstyled mb-0">
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Target Days:</span>
+                                <strong>{{ exercise_target.target_days_per_week }} days / week</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Completed This Week:</span>
+                                <strong class="text-primary">{{ workout_days_done }} days</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Target Active Minutes:</span>
+                                <strong>{{ exercise_target.target_minutes_per_week }} mins</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Minutes Logged:</span>
+                                <strong class="text-info">{{ total_workout_mins }} mins</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2">
+                                <span class="text-muted">Calories Burned:</span>
+                                <strong class="text-danger">{{ total_workout_cals }} kcal</strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 7-Day Chart -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3">Workout Minutes by Day</h6>
+                        <div style="height: 180px; position: relative;">
+                            <canvas id="tabExerciseChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workouts Log List -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0">Workout History</h5>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#logWorkoutModal">
+                                <i class="bi bi-plus-lg"></i> Log Workout
+                            </button>
+                        </div>
+
+                        {% if recent_workouts %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Workout</th>
+                                        <th>Duration</th>
+                                        <th>Intensity</th>
+                                        <th>Calories</th>
+                                        <th>Details / Exercises</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for w in recent_workouts %}
+                                    <tr>
+                                        <td class="small">{{ w.date.strftime('%b %d, %Y') }}</td>
+                                        <td>
+                                            <span class="fw-bold">{{ w.workout_type }}</span>
+                                        </td>
+                                        <td>{{ w.duration_minutes }}m</td>
+                                        <td>
+                                            <span class="badge {% if w.intensity == 'Extreme' %}bg-danger{% elif w.intensity == 'High' %}bg-warning text-dark{% elif w.intensity == 'Moderate' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                                {{ w.intensity }}
+                                            </span>
+                                        </td>
+                                        <td>{{ w.calories_burned or 0 }} kcal</td>
+                                        <td class="small text-muted">{{ w.exercises_details or w.notes or '-' }}</td>
+                                        <td class="text-end">
+                                            <form action="{{ url_for('health.delete_exercise', log_id=w.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this workout entry?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-activity display-4 opacity-25 d-block mb-3"></i>
+                            <h5>No workouts recorded yet</h5>
+                            <p class="small">Stay on top of your weekly targets by logging your workouts!</p>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#logWorkoutModal">Log First Workout</button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────── TAB 3: DIET & NUTRITION ─────────────────────── -->
+    <div class="tab-pane fade {% if active_tab == 'diet' %}show active{% endif %}" id="tab-diet" role="tabpanel">
+        <div class="row g-4">
+            <!-- Left: Nutrition Target & Macro Breakdown -->
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0">🥗 Daily Nutrition Target</h5>
+                            <button class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#setDietTargetModal">Edit</button>
+                        </div>
+                        <ul class="list-unstyled mb-0">
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Target Calories:</span>
+                                <strong>{{ diet_target.target_calories }} kcal</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Target Protein:</span>
+                                <strong>{{ diet_target.target_protein_g }} g</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Target Carbs:</span>
+                                <strong>{{ diet_target.target_carbs_g }} g</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2 border-bottom">
+                                <span class="text-muted">Target Fats:</span>
+                                <strong>{{ diet_target.target_fats_g }} g</strong>
+                            </li>
+                            <li class="d-flex justify-content-between py-2">
+                                <span class="text-muted">Target Water:</span>
+                                <strong>{{ diet_target.target_water_ml }} ml ({{ diet_target.target_water_ml // 250 }} glasses)</strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Macro Breakdown Chart -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3">Today's Macronutrients</h6>
+                        <div style="height: 180px; position: relative;">
+                            <canvas id="macroDonutChart"></canvas>
+                        </div>
+                        <div class="d-flex justify-content-around text-center mt-3 small">
+                            <div>
+                                <span class="badge bg-primary-subtle text-primary d-block mb-1">Protein</span>
+                                <strong>{{ today_protein|round(1) }}g</strong>
+                            </div>
+                            <div>
+                                <span class="badge bg-warning-subtle text-warning d-block mb-1">Carbs</span>
+                                <strong>{{ today_carbs|round(1) }}g</strong>
+                            </div>
+                            <div>
+                                <span class="badge bg-danger-subtle text-danger d-block mb-1">Fats</span>
+                                <strong>{{ today_fats|round(1) }}g</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Meals List for Today -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0">Today's Meal Log</h5>
+                            <button class="btn btn-warning btn-sm text-dark" data-bs-toggle="modal" data-bs-target="#logMealModal">
+                                <i class="bi bi-plus-lg"></i> Log Meal
+                            </button>
+                        </div>
+
+                        {% if today_meals %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Meal Type</th>
+                                        <th>Foods Taken</th>
+                                        <th>Tags</th>
+                                        <th>Calories</th>
+                                        <th>Macros (P / C / F / Fiber)</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for m in today_meals %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-warning-subtle text-dark fw-bold">{{ m.meal_type }}</span>
+                                        </td>
+                                        <td class="fw-semibold">{{ m.food_items }}</td>
+                                        <td>
+                                            {% for t in m.tags_list() %}
+                                            <span class="badge bg-secondary-subtle text-secondary small">{{ t }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td class="fw-bold">{{ m.calories|int }} kcal</td>
+                                        <td class="small text-muted">{{ m.protein_g|round(1) }}p / {{ m.carbs_g|round(1) }}c / {{ m.fats_g|round(1) }}f / {{ m.fiber_g|round(1) }}fib</td>
+                                        <td class="text-end">
+                                            <form action="{{ url_for('health.delete_diet', log_id=m.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this meal entry?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-egg-fried display-4 opacity-25 d-block mb-3"></i>
+                            <h5>No meals logged today</h5>
+                            <p class="small">Keep track of your calories, protein, and food groups easily!</p>
+                            <button class="btn btn-warning btn-sm text-dark" data-bs-toggle="modal" data-bs-target="#logMealModal">Log Breakfast / Meal</button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────── TAB 4: VITALS & BODY MEASUREMENTS ─────────────────────── -->
+    <div class="tab-pane fade {% if active_tab == 'vitals' %}show active{% endif %}" id="tab-vitals" role="tabpanel">
+        <div class="row g-4">
+            <!-- Left: Current Vitals & Visual BMI Scale -->
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0">⚖️ Current Body Vitals</h5>
+                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#logVitalsModal">
+                                <i class="bi bi-plus-lg"></i> Record Vitals
+                            </button>
+                        </div>
+
+                        {% if latest_vitals %}
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="p-3 bg-body-tertiary rounded text-center">
+                                    <span class="text-muted small">Weight</span>
+                                    <h4 class="fw-bold mb-0 mt-1">{{ latest_vitals.weight_kg }} kg</h4>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-body-tertiary rounded text-center">
+                                    <span class="text-muted small">Height</span>
+                                    <h4 class="fw-bold mb-0 mt-1">{{ latest_vitals.height_cm }} cm</h4>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-body-tertiary rounded text-center">
+                                    <span class="text-muted small">Blood Pressure</span>
+                                    <h5 class="fw-bold mb-0 mt-1">{% if latest_vitals.blood_pressure_systolic %}{{ latest_vitals.blood_pressure_systolic }}/{{ latest_vitals.blood_pressure_diastolic }}{% else %}-{% endif %}</h5>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-body-tertiary rounded text-center">
+                                    <span class="text-muted small">Heart Rate</span>
+                                    <h5 class="fw-bold mb-0 mt-1">{{ latest_vitals.resting_heart_rate or '-' }} bpm</h5>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-body-tertiary rounded text-center">
+                                    <span class="text-muted small">Vision (Right Eye)</span>
+                                    <h5 class="fw-bold mb-0 mt-1">{{ latest_vitals.vision_right or '-' }}</h5>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-body-tertiary rounded text-center">
+                                    <span class="text-muted small">Vision (Left Eye)</span>
+                                    <h5 class="fw-bold mb-0 mt-1">{{ latest_vitals.vision_left or '-' }}</h5>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BMI Meter & Interpretation -->
+                        {% if latest_vitals.bmi %}
+                        <div class="mt-4 pt-3 border-top">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold">BMI: {{ latest_vitals.bmi }}</span>
+                                <span class="badge bg-{{ latest_vitals.bmi_category.badge }}-subtle text-{{ latest_vitals.bmi_category.badge }} fw-bold">
+                                    {{ latest_vitals.bmi_category.label }}
+                                </span>
+                            </div>
+                            <!-- Visual BMI gradient bar -->
+                            <div class="bmi-bar-container">
+                                {% set pct_pos = ((latest_vitals.bmi / 40.0) * 100)|int %}
+                                <div class="bmi-pointer" style="left: {{ [0, [pct_pos, 100]|min]|max }}%;"></div>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted" style="font-size: 0.68rem;">
+                                <span>Underweight (&lt;18.5)</span>
+                                <span>Normal (18.5-24.9)</span>
+                                <span>Overweight (25-29.9)</span>
+                                <span>Obese (30+)</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-speedometer2 display-5 opacity-25 d-block mb-2"></i>
+                            <p class="small">No measurements recorded yet. Track your weight, height, BMI, BP, and eye vision.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Weight Trend Chart -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3">Weight History Trend (kg)</h6>
+                        <div style="height: 170px; position: relative;">
+                            <canvas id="weightTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Measurement Logs Table -->
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-3">Measurement History</h5>
+                        {% if all_vitals %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Weight</th>
+                                        <th>Height</th>
+                                        <th>BMI</th>
+                                        <th>BP</th>
+                                        <th>Vision (R / L)</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for v in all_vitals %}
+                                    <tr>
+                                        <td class="small">{{ v.date.strftime('%b %d, %Y') }}</td>
+                                        <td class="fw-bold">{{ v.weight_kg }} kg</td>
+                                        <td>{{ v.height_cm or '-' }} cm</td>
+                                        <td>
+                                            {% if v.bmi %}
+                                            <span class="badge bg-{{ v.bmi_category.badge }}-subtle text-{{ v.bmi_category.badge }}">{{ v.bmi }}</span>
+                                            {% else %}-{% endif %}
+                                        </td>
+                                        <td>{% if v.blood_pressure_systolic %}{{ v.blood_pressure_systolic }}/{{ v.blood_pressure_diastolic }}{% else %}-{% endif %}</td>
+                                        <td class="small">{{ v.vision_right or '-' }} / {{ v.vision_left or '-' }}</td>
+                                        <td class="text-end">
+                                            <form action="{{ url_for('health.delete_vitals', item_id=v.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this measurement entry?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted text-center py-4 small">No measurement logs available.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────── TAB 5: MEDICAL LAB REPORTS ─────────────────────── -->
+    <div class="tab-pane fade {% if active_tab == 'reports' %}show active{% endif %}" id="tab-reports" role="tabpanel">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                    <div>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-file-earmark-medical-fill text-primary me-2"></i>Medical Lab & Diagnostics Reports</h5>
+                        <p class="text-muted small mb-0">Upload lab test PDFs (CBC, Lipid Profile, Vitamins, Metabolic panels) and easily inspect biomarker reference ranges.</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadReportModal">
+                        <i class="bi bi-cloud-arrow-up"></i> Upload Medical Report
+                    </button>
+                </div>
+
+                {% if medical_reports %}
+                <div class="row g-3">
+                    {% for report in medical_reports %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card border shadow-sm h-100">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="fw-bold mb-0 text-primary">
+                                        <a href="{{ url_for('health.view_report_detail', report_id=report.id) }}" class="text-decoration-none text-body">
+                                            {{ report.title }}
+                                        </a>
+                                    </h6>
+                                    <span class="badge bg-secondary-subtle text-secondary small">{{ report.test_date.strftime('%b %d, %Y') }}</span>
+                                </div>
+                                <p class="text-muted small mb-2">
+                                    <i class="bi bi-geo-alt"></i> {{ report.lab_name or "Diagnostic Center" }}
+                                    {% if report.doctor_name %} | Dr. {{ report.doctor_name }}{% endif %}
+                                </p>
+                                
+                                <!-- Quick Highlights -->
+                                <div class="p-2 bg-body-tertiary rounded small mb-3 flex-grow-1">
+                                    <div class="row g-1">
+                                        {% if report.hemoglobin %}
+                                        <div class="col-6">Hb: <strong>{{ report.hemoglobin }} g/dL</strong></div>
+                                        {% endif %}
+                                        {% if report.total_cholesterol %}
+                                        <div class="col-6">Chol: <strong>{{ report.total_cholesterol }} mg/dL</strong></div>
+                                        {% endif %}
+                                        {% if report.vitamin_d %}
+                                        <div class="col-6">Vit D: <strong>{{ report.vitamin_d }} ng/mL</strong></div>
+                                        {% endif %}
+                                        {% if report.blood_sugar_fasting %}
+                                        <div class="col-6">Sugar: <strong>{{ report.blood_sugar_fasting }} mg/dL</strong></div>
+                                        {% endif %}
+                                    </div>
+                                    {% if report.summary_notes %}
+                                    <div class="text-muted mt-1 small fst-italic">{{ report.summary_notes|truncate(70) }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
+                                    <a href="{{ url_for('health.view_report_detail', report_id=report.id) }}" class="btn btn-sm btn-outline-primary">
+                                        Full Analysis →
+                                    </a>
+                                    <div class="d-flex gap-2">
+                                        {% if report.pdf_filename %}
+                                        <a href="{{ url_for('health.download_report_pdf', report_id=report.id) }}" target="_blank" class="btn btn-sm btn-outline-danger" title="Open PDF">
+                                            <i class="bi bi-file-pdf"></i> View PDF
+                                        </a>
+                                        {% endif %}
+                                        <form action="{{ url_for('health.delete_report', report_id=report.id) }}" method="POST" onsubmit="return confirm('Delete this report and PDF?');" class="m-0">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-file-earmark-medical display-4 opacity-25 d-block mb-3"></i>
+                    <h5>No medical reports uploaded</h5>
+                    <p class="small">Upload your full body blood tests, CBC, lipid profile, and vitamin reports in PDF format.</p>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadReportModal">Upload First Report</button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────── TAB 6: HEALTH ISSUES & DOCTOR VISITS ─────────────────────── -->
+    <div class="tab-pane fade {% if active_tab == 'issues' %}show active{% endif %}" id="tab-issues" role="tabpanel">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                    <div>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-hospital-fill text-danger me-2"></i>Health Issues & Doctor Consultations</h5>
+                        <p class="text-muted small mb-0">Record fevers, ailments, clinic visits, doctor prescriptions, and recovery status.</p>
+                    </div>
+                    <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#logIssueModal">
+                        <i class="bi bi-plus-lg"></i> Log Issue / Doctor Visit
+                    </button>
+                </div>
+
+                {% if all_issues %}
+                <div class="row g-3">
+                    {% for issue in all_issues %}
+                    <div class="col-md-6">
+                        <div class="card border shadow-sm h-100 {% if issue.status == 'Active' %}border-warning{% endif %}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <h6 class="fw-bold mb-1">{{ issue.title }}</h6>
+                                        <span class="badge bg-secondary-subtle text-secondary small">{{ issue.issue_type }}</span>
+                                        <span class="badge {% if issue.severity == 'Severe' %}bg-danger{% elif issue.severity == 'Moderate' %}bg-warning text-dark{% else %}bg-info text-white{% endif %} small">
+                                            {{ issue.severity }}
+                                        </span>
+                                    </div>
+                                    <span class="badge {% if issue.status == 'Active' %}bg-warning text-dark{% elif issue.status == 'Recovering' %}bg-info text-white{% else %}bg-success{% endif %}">
+                                        {{ issue.status }}
+                                    </span>
+                                </div>
+
+                                <p class="text-muted small mb-2">
+                                    <strong>Started:</strong> {{ issue.start_date.strftime('%b %d, %Y') }}
+                                    {% if issue.end_date %} | <strong>Ended:</strong> {{ issue.end_date.strftime('%b %d, %Y') }}{% endif %}
+                                </p>
+
+                                {% if issue.symptoms %}
+                                <div class="mb-2 small">
+                                    <strong class="text-muted">Symptoms:</strong> {{ issue.symptoms }}
+                                </div>
+                                {% endif %}
+
+                                {% if issue.doctor_visited %}
+                                <div class="p-2 bg-body-tertiary rounded small mb-2">
+                                    <div><i class="bi bi-person-fill-check text-primary"></i> <strong>Doctor:</strong> {{ issue.doctor_name or 'Doctor' }} ({{ issue.clinic_hospital or 'Clinic' }})</div>
+                                    {% if issue.diagnosis %}
+                                    <div class="mt-1"><strong>Diagnosis:</strong> {{ issue.diagnosis }}</div>
+                                    {% endif %}
+                                    {% if issue.prescription %}
+                                    <div class="mt-1"><strong>Prescription:</strong> {{ issue.prescription }}</div>
+                                    {% endif %}
+                                    {% if issue.follow_up_date %}
+                                    <div class="mt-1 text-danger"><strong>Follow-up date:</strong> {{ issue.follow_up_date.strftime('%b %d, %Y') }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <!-- Toggle Status Form -->
+                                    <form action="{{ url_for('health.update_issue_status', issue_id=issue.id) }}" method="POST" class="d-inline m-0">
+                                        {% if issue.status != 'Resolved' %}
+                                        <input type="hidden" name="status" value="Resolved">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Mark Resolved</button>
+                                        {% else %}
+                                        <input type="hidden" name="status" value="Active">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning text-dark">Reopen Issue</button>
+                                        {% endif %}
+                                    </form>
+
+                                    <form action="{{ url_for('health.delete_health_issue', issue_id=issue.id) }}" method="POST" class="d-inline m-0" onsubmit="return confirm('Delete this health issue?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-emoji-smile display-4 opacity-25 d-block mb-3 text-success"></i>
+                    <h5>No health issues recorded</h5>
+                    <p class="small">Great health! Record any future symptoms, fevers, or doctor consultations here.</p>
+                    <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#logIssueModal">Log Issue</button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════ MODALS ═══════════════════════ -->
+
+<!-- 1. Log Workout Modal -->
+<div class="modal fade" id="logWorkoutModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.log_exercise') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-activity text-primary"></i> Log Exercise</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" class="form-control" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Workout Type</label>
+                        <select name="workout_type" class="form-select" required>
+                            <option value="Running">Running</option>
+                            <option value="Gym / Strength">Gym / Strength Training</option>
+                            <option value="Cardio / Aerobics">Cardio / Aerobics</option>
+                            <option value="HIIT">HIIT</option>
+                            <option value="Yoga / Stretching">Yoga / Stretching</option>
+                            <option value="Walking">Walking</option>
+                            <option value="Cycling">Cycling</option>
+                            <option value="Swimming">Swimming</option>
+                            <option value="Sports">Sports</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Duration (Minutes)</label>
+                        <input type="number" name="duration_minutes" class="form-control" placeholder="e.g. 45" min="1" value="30" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Calories Burned (kcal)</label>
+                        <input type="number" name="calories_burned" class="form-control" placeholder="e.g. 280" min="0">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Intensity</label>
+                        <select name="intensity" class="form-select">
+                            <option value="Low">Low (Light workout, gentle pace)</option>
+                            <option value="Moderate" selected>Moderate (Standard workout)</option>
+                            <option value="High">High (Challenging, elevated heart rate)</option>
+                            <option value="Extreme">Extreme (Maximum effort / exhaustion)</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Exercises / Notes</label>
+                        <textarea name="exercises_details" class="form-control" rows="2" placeholder="e.g. 5km run pace 5:30, or Bench Press 3x10, Squats 4x8"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save Workout</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. Set Weekly Exercise Target Modal -->
+<div class="modal fade" id="setExerciseTargetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.set_exercise_target') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">🎯 Set Weekly Exercise Target</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Target Workout Days per Week</label>
+                        <input type="number" name="target_days_per_week" class="form-control" min="1" max="7" value="{{ exercise_target.target_days_per_week }}" required>
+                        <div class="form-text">Recommended: 3 to 5 days per week.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Target Active Minutes per Week</label>
+                        <input type="number" name="target_minutes_per_week" class="form-control" min="30" value="{{ exercise_target.target_minutes_per_week }}" required>
+                        <div class="form-text">WHO recommends at least 150 minutes of moderate activity weekly.</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Target Calories Burned per Week</label>
+                        <input type="number" name="target_calories_per_week" class="form-control" value="{{ exercise_target.target_calories_per_week or 1500 }}">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Update Target</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. Log Meal Modal -->
+<div class="modal fade" id="logMealModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.log_diet') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-egg-fried text-warning"></i> Log Meal & Nutrition</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" class="form-control" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Meal Type</label>
+                        <select name="meal_type" class="form-select" required>
+                            <option value="Breakfast">Breakfast</option>
+                            <option value="Lunch">Lunch</option>
+                            <option value="Dinner">Dinner</option>
+                            <option value="Snack">Snack</option>
+                            <option value="Pre-Workout">Pre-Workout</option>
+                            <option value="Post-Workout">Post-Workout</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Foods Eaten</label>
+                        <textarea name="food_items" class="form-control" rows="2" placeholder="e.g. 2 rotis with dal, bowl of salad, and greek yogurt" required></textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Food Group Tags (Optional)</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for tag in ['Vegetables', 'Fruits', 'Cereals / Grains', 'Bread / Rotis', 'Dairy', 'Eggs / Poultry', 'Legumes / Pulses', 'Nuts / Seeds', 'Fast Food', 'Sweets'] %}
+                            <label class="form-check-label">
+                                <input type="checkbox" name="food_tags" value="{{ tag }}" class="btn-check" id="tag-{{ loop.index }}">
+                                <span class="badge food-tag-badge" onclick="this.classList.toggle('active')">{{ tag }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Calories (kcal)</label>
+                        <input type="number" step="any" name="calories" class="form-control" placeholder="450" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Protein (g)</label>
+                        <input type="number" step="any" name="protein_g" class="form-control" placeholder="25">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Carbs (g)</label>
+                        <input type="number" step="any" name="carbs_g" class="form-control" placeholder="50">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Fats (g)</label>
+                        <input type="number" step="any" name="fats_g" class="form-control" placeholder="12">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Fiber (g)</label>
+                        <input type="number" step="any" name="fiber_g" class="form-control" placeholder="6">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning btn-sm text-dark">Save Meal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. Set Daily Nutrition Target Modal -->
+<div class="modal fade" id="setDietTargetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.set_diet_target') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">🥗 Set Daily Nutrition Targets</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Daily Calories (kcal)</label>
+                        <input type="number" name="target_calories" class="form-control" value="{{ diet_target.target_calories }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Daily Protein (g)</label>
+                        <input type="number" step="any" name="target_protein_g" class="form-control" value="{{ diet_target.target_protein_g }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Daily Carbs (g)</label>
+                        <input type="number" step="any" name="target_carbs_g" class="form-control" value="{{ diet_target.target_carbs_g }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Daily Fats (g)</label>
+                        <input type="number" step="any" name="target_fats_g" class="form-control" value="{{ diet_target.target_fats_g }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Daily Fiber (g)</label>
+                        <input type="number" step="any" name="target_fiber_g" class="form-control" value="{{ diet_target.target_fiber_g }}" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Target Water Intake (ml)</label>
+                        <input type="number" name="target_water_ml" class="form-control" value="{{ diet_target.target_water_ml }}" required>
+                        <div class="form-text">2500 ml is roughly 10 glasses of water per day.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning btn-sm text-dark">Save Nutrition Targets</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 5. Record Vitals Modal -->
+<div class="modal fade" id="logVitalsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.log_vitals') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-speedometer2 text-success"></i> Record Body Measurements & Vitals</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Date</label>
+                        <input type="date" name="date" class="form-control" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Weight (kg)</label>
+                        <input type="number" step="0.1" name="weight_kg" class="form-control" placeholder="e.g. 72.5" value="{{ latest_vitals.weight_kg if latest_vitals else '' }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Height (cm)</label>
+                        <input type="number" step="0.1" name="height_cm" class="form-control" placeholder="e.g. 175" value="{{ latest_vitals.height_cm if latest_vitals else '' }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">BP Systolic (mmHg)</label>
+                        <input type="number" name="blood_pressure_systolic" class="form-control" placeholder="e.g. 120">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">BP Diastolic (mmHg)</label>
+                        <input type="number" name="blood_pressure_diastolic" class="form-control" placeholder="e.g. 80">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Right Eye Vision</label>
+                        <input type="text" name="vision_right" class="form-control" placeholder="e.g. -1.50 or 6/6" value="{{ latest_vitals.vision_right if latest_vitals else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Left Eye Vision</label>
+                        <input type="text" name="vision_left" class="form-control" placeholder="e.g. -1.75 or 6/6" value="{{ latest_vitals.vision_left if latest_vitals else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Resting Heart Rate (bpm)</label>
+                        <input type="number" name="resting_heart_rate" class="form-control" placeholder="e.g. 70">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Waist Circumference (cm)</label>
+                        <input type="number" step="0.1" name="waist_cm" class="form-control" placeholder="Optional">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success btn-sm">Save Measurements</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 6. Upload Medical Report Modal (Includes CBC, Lipid, Vitamins, Metabolic inputs & PDF) -->
+<div class="modal fade" id="uploadReportModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <form action="{{ url_for('health.upload_report') }}" method="POST" enctype="multipart/form-data" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-medical text-primary"></i> Upload Medical Lab Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Report Title</label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g. Annual Full Body Checkup" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Test Date</label>
+                        <input type="date" name="test_date" class="form-control" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Diagnostic Lab / Hospital</label>
+                        <input type="text" name="lab_name" class="form-control" placeholder="e.g. Metropolis / Dr Lal PathLabs">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Doctor's Name</label>
+                        <input type="text" name="doctor_name" class="form-control" placeholder="e.g. Dr. Sharma">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold text-danger"><i class="bi bi-file-pdf"></i> Upload Report PDF</label>
+                        <input type="file" name="report_pdf" class="form-control" accept=".pdf">
+                        <div class="form-text">Attach your lab report PDF for safe archiving and one-click viewing.</div>
+                    </div>
+                </div>
+
+                <div class="accordion" id="reportParamsAccordion">
+                    <!-- Complete Blood Count (CBC) -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#cbcCollapse">
+                                🩸 Complete Blood Count (CBC)
+                            </button>
+                        </h2>
+                        <div id="cbcCollapse" class="accordion-collapse collapse" data-bs-parent="#reportParamsAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Hemoglobin (g/dL)</label>
+                                        <input type="number" step="any" name="hemoglobin" class="form-control form-control-sm" placeholder="13.5">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">WBC Count (/mcL)</label>
+                                        <input type="number" step="any" name="wbc_count" class="form-control form-control-sm" placeholder="6500">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">RBC Count (mil/mcL)</label>
+                                        <input type="number" step="any" name="rbc_count" class="form-control form-control-sm" placeholder="4.8">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Platelet Count (k/mcL)</label>
+                                        <input type="number" step="any" name="platelet_count" class="form-control form-control-sm" placeholder="250">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Hematocrit (%)</label>
+                                        <input type="number" step="any" name="hematocrit_pct" class="form-control form-control-sm" placeholder="42.0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lipid Profile -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#lipidCollapse">
+                                🥑 Lipid Profile (Cholesterol & Fats)
+                            </button>
+                        </h2>
+                        <div id="lipidCollapse" class="accordion-collapse collapse" data-bs-parent="#reportParamsAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Total Cholesterol (mg/dL)</label>
+                                        <input type="number" step="any" name="total_cholesterol" class="form-control form-control-sm" placeholder="185">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">HDL Good Chol (mg/dL)</label>
+                                        <input type="number" step="any" name="hdl_cholesterol" class="form-control form-control-sm" placeholder="52">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">LDL Bad Chol (mg/dL)</label>
+                                        <input type="number" step="any" name="ldl_cholesterol" class="form-control form-control-sm" placeholder="95">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Triglycerides (mg/dL)</label>
+                                        <input type="number" step="any" name="triglycerides" class="form-control form-control-sm" placeholder="120">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">VLDL (mg/dL)</label>
+                                        <input type="number" step="any" name="vldl" class="form-control form-control-sm" placeholder="24">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vitamins & Minerals -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#vitaminsCollapse">
+                                💊 Vitamins & Minerals
+                            </button>
+                        </h2>
+                        <div id="vitaminsCollapse" class="accordion-collapse collapse" data-bs-parent="#reportParamsAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Vitamin D3 (ng/mL)</label>
+                                        <input type="number" step="any" name="vitamin_d" class="form-control form-control-sm" placeholder="38.0">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Vitamin B12 (pg/mL)</label>
+                                        <input type="number" step="any" name="vitamin_b12" class="form-control form-control-sm" placeholder="420">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Iron / Ferritin (ng/mL)</label>
+                                        <input type="number" step="any" name="iron_ferritin" class="form-control form-control-sm" placeholder="85">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small">Serum Calcium (mg/dL)</label>
+                                        <input type="number" step="any" name="calcium" class="form-control form-control-sm" placeholder="9.4">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metabolic & Organ Function -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#metabolicCollapse">
+                                🧪 Metabolic, Sugar, Liver, Kidney & Thyroid
+                            </button>
+                        </h2>
+                        <div id="metabolicCollapse" class="accordion-collapse collapse" data-bs-parent="#reportParamsAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Fasting Blood Sugar (mg/dL)</label>
+                                        <input type="number" step="any" name="blood_sugar_fasting" class="form-control form-control-sm" placeholder="88">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">HbA1c (%)</label>
+                                        <input type="number" step="any" name="hba1c" class="form-control form-control-sm" placeholder="5.2">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Serum Creatinine (mg/dL)</label>
+                                        <input type="number" step="any" name="serum_creatinine" class="form-control form-control-sm" placeholder="0.9">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Uric Acid (mg/dL)</label>
+                                        <input type="number" step="any" name="uric_acid" class="form-control form-control-sm" placeholder="4.5">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">SGPT / ALT (U/L)</label>
+                                        <input type="number" step="any" name="sgpt_alt" class="form-control form-control-sm" placeholder="24">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">SGOT / AST (U/L)</label>
+                                        <input type="number" step="any" name="sgot_ast" class="form-control form-control-sm" placeholder="22">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">TSH (uIU/mL)</label>
+                                        <input type="number" step="any" name="tsh" class="form-control form-control-sm" placeholder="2.1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label small fw-bold">Doctor's Notes & Summary</label>
+                    <textarea name="summary_notes" class="form-control" rows="2" placeholder="e.g. All parameters within normal limits. Recommended annual re-check."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save Medical Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 7. Log Health Issue / Doctor Visit Modal -->
+<div class="modal fade" id="logIssueModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.log_health_issue') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-hospital text-danger"></i> Log Health Issue / Doctor Visit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Condition / Issue Title</label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g. Viral Fever, Lower Back Sprain, Wisdom Tooth" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Category</label>
+                        <select name="issue_type" class="form-select">
+                            <option value="Fever / Infection">Fever / Infection</option>
+                            <option value="Injury / Pain">Injury / Muscle Pain</option>
+                            <option value="Digestive">Digestive / Stomach</option>
+                            <option value="Respiratory">Cold / Cough / Respiratory</option>
+                            <option value="Dental">Dental</option>
+                            <option value="ENT / Eye">ENT / Eye Issue</option>
+                            <option value="Skin">Skin / Allergy</option>
+                            <option value="Chronic">Chronic Condition</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Severity</label>
+                        <select name="severity" class="form-select">
+                            <option value="Mild">Mild</option>
+                            <option value="Moderate" selected>Moderate</option>
+                            <option value="Severe">Severe</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Start Date</label>
+                        <input type="date" name="start_date" class="form-control" value="{{ today.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Current Status</label>
+                        <select name="status" class="form-select">
+                            <option value="Active" selected>Active</option>
+                            <option value="Recovering">Recovering</option>
+                            <option value="Resolved">Resolved</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Symptoms Reported</label>
+                        <textarea name="symptoms" class="form-control" rows="2" placeholder="e.g. High fever (102 F), body ache, chills"></textarea>
+                    </div>
+                    
+                    <!-- Doctor Visit Section -->
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="doctor_visited" id="doctorVisitedToggle" onchange="document.getElementById('doctorDetailsBox').classList.toggle('d-none', !this.checked);">
+                            <label class="form-check-label fw-bold small" for="doctorVisitedToggle">Visited a Doctor / Clinic?</label>
+                        </div>
+                    </div>
+                    <div id="doctorDetailsBox" class="col-12 d-none">
+                        <div class="p-3 bg-body-tertiary rounded">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Doctor Name</label>
+                                    <input type="text" name="doctor_name" class="form-control form-control-sm" placeholder="e.g. Dr. Verma">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Clinic / Hospital</label>
+                                    <input type="text" name="clinic_hospital" class="form-control form-control-sm" placeholder="e.g. City Health Care">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small">Doctor's Diagnosis</label>
+                                    <input type="text" name="diagnosis" class="form-control form-control-sm" placeholder="e.g. Viral Pharyngitis">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small">Prescription / Medications</label>
+                                    <textarea name="prescription" class="form-control form-control-sm" rows="2" placeholder="e.g. Paracetamol 650mg TDS x 3 days, Vitamin C 500mg"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Follow-up Date</label>
+                                    <input type="date" name="follow_up_date" class="form-control form-control-sm">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger btn-sm">Save Health Issue</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 8. Log Sleep & Energy Modal -->
+<div class="modal fade" id="logSleepModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('health.log_sleep') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-moon-stars text-info"></i> Log Sleep & Recovery</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Sleep Duration (Hours)</label>
+                        <input type="number" step="0.5" name="sleep_hours" class="form-control" value="{{ daily_health.sleep_hours or 7.0 }}" min="0" max="24" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Sleep Quality</label>
+                        <select name="sleep_quality" class="form-select">
+                            <option value="Excellent" {% if daily_health.sleep_quality == 'Excellent' %}selected{% endif %}>Excellent (Deep, refreshing sleep)</option>
+                            <option value="Good" {% if daily_health.sleep_quality == 'Good' %}selected{% endif %}>Good (Woke up energized)</option>
+                            <option value="Fair" {% if daily_health.sleep_quality == 'Fair' %}selected{% endif %}>Fair (Interrupted sleep)</option>
+                            <option value="Poor" {% if daily_health.sleep_quality == 'Poor' %}selected{% endif %}>Poor (Restless / tired)</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">Energy Level (1-5)</label>
+                        <input type="range" name="energy_level" class="form-range" min="1" max="5" value="{{ daily_health.energy_level or 4 }}">
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>1 (Drained)</span>
+                            <span>3 (Normal)</span>
+                            <span>5 (Vibrant)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-info btn-sm text-white">Save Sleep</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+    const tickColor = isDark ? '#adb5bd' : '#6c757d';
+
+    // ── 1. Overview Weekly Workout Chart ────────────────────────────
+    const ovWkCtx = document.getElementById('overviewWorkoutChart');
+    if (ovWkCtx) {
+        new Chart(ovWkCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ day_workout_labels | tojson }},
+                datasets: [{
+                    label: 'Minutes Active',
+                    data: {{ day_workout_mins | tojson }},
+                    backgroundColor: 'rgba(13, 110, 253, 0.75)',
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: tickColor, precision: 0 } },
+                    x: { grid: { display: false }, ticks: { color: tickColor } }
+                }
+            }
+        });
+    }
+
+    // ── 2. Tab Exercise Chart ───────────────────────────────────────
+    const tabExCtx = document.getElementById('tabExerciseChart');
+    if (tabExCtx) {
+        new Chart(tabExCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ day_workout_labels | tojson }},
+                datasets: [{
+                    label: 'Minutes',
+                    data: {{ day_workout_mins | tojson }},
+                    backgroundColor: 'rgba(13, 202, 240, 0.75)',
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: tickColor, precision: 0 } },
+                    x: { grid: { display: false }, ticks: { color: tickColor } }
+                }
+            }
+        });
+    }
+
+    // ── 3. Diet Macro Donut Chart ───────────────────────────────────
+    const macroCtx = document.getElementById('macroDonutChart');
+    if (macroCtx) {
+        const p = {{ today_protein }};
+        const c = {{ today_carbs }};
+        const f = {{ today_fats }};
+        const hasData = (p + c + f) > 0;
+        new Chart(macroCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Protein (g)', 'Carbs (g)', 'Fats (g)'],
+                datasets: [{
+                    data: hasData ? [p, c, f] : [1, 1, 1],
+                    backgroundColor: hasData 
+                        ? ['#0d6efd', '#ffc107', '#dc3545'] 
+                        : [isDark ? '#2d333b' : '#dee2e6', isDark ? '#2d333b' : '#dee2e6', isDark ? '#2d333b' : '#dee2e6'],
+                    borderWidth: 0,
+                }]
+            },
+            options: {
+                cutout: '70%',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: hasData }
+                }
+            }
+        });
+    }
+
+    // ── 4. Weight Trend Line Chart ──────────────────────────────────
+    const weightCtx = document.getElementById('weightTrendChart');
+    if (weightCtx) {
+        new Chart(weightCtx, {
+            type: 'line',
+            data: {
+                labels: {{ vitals_chart_labels | tojson }},
+                datasets: [{
+                    label: 'Weight (kg)',
+                    data: {{ vitals_chart_weights | tojson }},
+                    borderColor: '#198754',
+                    backgroundColor: 'rgba(25, 135, 84, 0.08)',
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#198754',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: false, grid: { color: gridColor }, ticks: { color: tickColor } },
+                    x: { grid: { display: false }, ticks: { color: tickColor } }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

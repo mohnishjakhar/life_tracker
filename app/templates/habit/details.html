@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+{% block title %}Habit Details - {{ habit.name }}{% endblock %}
+{% block content %}
+<style>
+    /* ── GitHub / LeetCode contribution heatmap ── */
+    .contrib-wrapper {
+        overflow-x: auto;
+        padding-bottom: 6px;
+    }
+
+    .contrib-graph {
+        display: flex;
+        flex-direction: row;
+        gap: 3px;
+        width: max-content;
+    }
+
+    .contrib-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .contrib-cell {
+        width: 13px;
+        height: 13px;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: transform 0.1s, outline 0.1s;
+        position: relative;
+    }
+
+    .contrib-cell:hover {
+        transform: scale(1.3);
+        outline: 2px solid #57cc99;
+        z-index: 10;
+    }
+
+    /* Level 0 = empty / no log */
+    .contrib-l0 {
+        background-color: #ebedf0;
+    }
+
+    [data-bs-theme="dark"] .contrib-l0 {
+        background-color: #21262d;
+    }
+
+    /* Level 1-4 = light → dark green */
+    .contrib-l1 {
+        background-color: #9be9a8;
+    }
+
+    .contrib-l2 {
+        background-color: #40c463;
+    }
+
+    .contrib-l3 {
+        background-color: #30a14e;
+    }
+
+    .contrib-l4 {
+        background-color: #216e39;
+    }
+
+    [data-bs-theme="dark"] .contrib-l1 {
+        background-color: #0e4429;
+    }
+
+    [data-bs-theme="dark"] .contrib-l2 {
+        background-color: #006d32;
+    }
+
+    [data-bs-theme="dark"] .contrib-l3 {
+        background-color: #26a641;
+    }
+
+    [data-bs-theme="dark"] .contrib-l4 {
+        background-color: #39d353;
+    }
+
+    .contrib-month-labels {
+        display: flex;
+        flex-direction: row;
+        gap: 3px;
+        width: max-content;
+        margin-bottom: 4px;
+    }
+
+    .contrib-month-label {
+        font-size: 0.72rem;
+        color: var(--bs-secondary-color);
+        width: 13px;
+        text-align: center;
+    }
+
+    .contrib-weekday-labels {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        margin-right: 4px;
+        margin-top: 22px;
+        /* align with first row after month labels */
+    }
+
+    .contrib-weekday-label {
+        font-size: 0.72rem;
+        color: var(--bs-secondary-color);
+        height: 13px;
+        display: flex;
+        align-items: center;
+    }
+
+    .contrib-legend {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color);
+    }
+
+    .contrib-legend .contrib-cell {
+        cursor: default;
+        transform: none !important;
+        outline: none !important;
+    }
+
+    /* Tooltip */
+    .contrib-tooltip {
+        position: fixed;
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        pointer-events: none;
+        display: none;
+        z-index: 9999;
+        white-space: nowrap;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">{{ habit.name }}</h2>
+        <p class="text-muted mb-0">{{ habit.description or "No description provided." }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('habit.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+        <form action="{{ url_for('habit.archive_habit', habit_id=habit.id) }}" method="POST">
+            <button type="submit" class="btn btn-outline-warning">
+                <i class="bi bi-archive"></i> Archive Habit
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Stats widgets -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 text-center py-3">
+            <h3 class="fw-bold text-success mb-1">{{ current_streak }} 🔥</h3>
+            <span class="text-muted small">Current Streak</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 text-center py-3">
+            <h3 class="fw-bold text-primary mb-1">{{ longest_streak }} 🏆</h3>
+            <span class="text-muted small">Longest Streak</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 text-center py-3">
+            <h3 class="fw-bold text-info mb-1">{{ total_logs }} 📝</h3>
+            <span class="text-muted small">Total Logs</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 text-center py-3">
+            <h3 class="fw-bold text-warning mb-1">
+                {% if habit.measurement_type == 'boolean' %}
+                {{ completion_rate }}%
+                {% else %}
+                {{ avg_value }} <small class="fs-6 text-muted">{{ habit.measurement_unit }}</small>
+                {% endif %}
+            </h3>
+            <span class="text-muted small">
+                {% if habit.measurement_type == 'boolean' %}
+                Completion Rate
+                {% else %}
+                Average Logged Value
+                {% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Interactive Calendar and Details Graph -->
+    <div class="col-lg-8">
+        <!-- GitHub / LeetCode-style Contribution Heatmap -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title fw-bold mb-0">Activity Heatmap</h5>
+                    <div class="contrib-legend">
+                        <span>Less</span>
+                        <div class="contrib-cell contrib-l0"></div>
+                        <div class="contrib-cell contrib-l1"></div>
+                        <div class="contrib-cell contrib-l2"></div>
+                        <div class="contrib-cell contrib-l3"></div>
+                        <div class="contrib-cell contrib-l4"></div>
+                        <span>More</span>
+                    </div>
+                </div>
+
+                <div class="d-flex">
+                    <!-- Weekday labels (Mon / Wed / Fri only like GitHub) -->
+                    <div class="contrib-weekday-labels">
+                        <div class="contrib-weekday-label"></div>
+                        <div class="contrib-weekday-label">Mon</div>
+                        <div class="contrib-weekday-label"></div>
+                        <div class="contrib-weekday-label">Wed</div>
+                        <div class="contrib-weekday-label"></div>
+                        <div class="contrib-weekday-label">Fri</div>
+                        <div class="contrib-weekday-label"></div>
+                    </div>
+
+                    <div style="overflow-x: auto; flex: 1;">
+                        <!-- Month label row rendered by JS -->
+                        <div class="contrib-month-labels" id="heatmapMonthLabels"></div>
+                        <!-- Main grid rendered by JS -->
+                        <div class="contrib-graph" id="heatmapGrid"></div>
+                    </div>
+                </div>
+
+                <div class="contrib-tooltip" id="contribTooltip"></div>
+            </div>
+        </div>
+
+        <!-- Progress Trend Graph -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-4">Last 30 Days Trend</h5>
+                <div style="height: 300px; position: relative;">
+                    <canvas id="habitChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Add Custom Log & History -->
+    <div class="col-lg-4">
+        <!-- Log Custom Date -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-3">Log Custom Date</h5>
+                <form action="{{ url_for('habit.add_log') }}" method="POST">
+                    <input type="hidden" name="habit_id" value="{{ habit.id }}">
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" class="form-control" value="{{ today }}" max="{{ today }}"
+                            required>
+                    </div>
+
+                    {% if habit.measurement_type != 'boolean' %}
+                    <div class="mb-3">
+                        <label class="form-label">Value ({{ habit.measurement_unit }})</label>
+                        <input type="number" step="any" name="value" class="form-control" required
+                            placeholder="e.g. 30, 5, 1.5">
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <input type="text" name="notes" class="form-control"
+                            placeholder="e.g. Felt great, slow progress">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Save Log</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- History -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-3">Logs History</h5>
+                {% if logs %}
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for log in logs %}
+                        <li class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="fw-bold small">{{ log.date.strftime('%b %d, %Y') }}</span>
+                                {% if habit.measurement_type != 'boolean' %}
+                                <span class="badge bg-secondary-subtle text-secondary ms-2">{{ log.value }} {{
+                                    habit.measurement_unit }}</span>
+                                {% endif %}
+                                {% if log.notes %}
+                                <p class="text-muted small mb-0 mt-1 italic">"{{ log.notes }}"</p>
+                                {% endif %}
+                            </div>
+                            <form action="{{ url_for('habit.delete_log', log_id=log.id) }}" method="POST"
+                                onsubmit="return confirm('Are you sure you want to delete this log?');">
+                                <button type="submit" class="btn btn-sm text-danger p-0 border-0 bg-transparent"
+                                    title="Delete log">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">No logs saved yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Fetch stats from the API
+        fetch("{{ url_for('habit.get_habit_stats', habit_id=habit.id) }}")
+            .then(res => res.json())
+            .then(data => {
+                // ── Build value lookup map from full history (bug fix: use all_logged_values)
+                const valueMap = data.all_logged_values || {};
+                // Also overlay the 30-day precise values
+                data.dates.forEach((d, i) => { if (data.values[i] > 0) valueMap[d] = data.values[i]; });
+
+                // ── Compute intensity levels ──
+                // max value in the map to normalise into 4 levels
+                const vals = Object.values(valueMap).filter(v => v > 0);
+                const maxVal = vals.length > 0 ? Math.max(...vals) : 1;
+
+                function getLevel(v) {
+                    if (!v || v <= 0) return 0;
+                    if (maxVal === 0) return 1;
+                    const ratio = v / maxVal;
+                    if (ratio <= 0.25) return 1;
+                    if (ratio <= 0.50) return 2;
+                    if (ratio <= 0.75) return 3;
+                    return 4;
+                }
+
+                // ── Build 365-day heatmap ──
+                buildHeatmap(valueMap, getLevel, data.measurement_unit);
+
+                // ── Chart.js trend graph ──
+                const ctx = document.getElementById('habitChart').getContext('2d');
+                const isBoolean = data.measurement_type === 'boolean';
+
+                new Chart(ctx, {
+                    type: isBoolean ? 'bar' : 'line',
+                    data: {
+                        labels: data.dates.map(d => {
+                            const dateObj = new Date(d + 'T00:00:00');
+                            return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        }),
+                        datasets: [{
+                            label: isBoolean ? 'Completed' : `Value (${data.measurement_unit})`,
+                            data: data.values,
+                            borderColor: '#40c463',
+                            backgroundColor: isBoolean ? 'rgba(64,196,99,0.4)' : 'rgba(64,196,99,0.1)',
+                            borderWidth: 2.5,
+                            fill: !isBoolean,
+                            tension: 0.3,
+                            pointBackgroundColor: '#216e39',
+                            pointRadius: isBoolean ? 0 : 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: isBoolean ? 1 : undefined,
+                                    precision: isBoolean ? 0 : undefined
+                                }
+                            },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            })
+            .catch(err => console.error("Error loading stats:", err));
+
+        // ─────────────────────────────────────────────
+        //  GitHub-style Heatmap builder
+        // ─────────────────────────────────────────────
+        function buildHeatmap(valueMap, getLevel, unit) {
+            const grid = document.getElementById('heatmapGrid');
+            const monthLabels = document.getElementById('heatmapMonthLabels');
+            const tooltip = document.getElementById('contribTooltip');
+
+            // Build array of last 365 days starting from a Sunday
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Go back to most recent Sunday for a clean start
+            const dayOfWeek = today.getDay(); // 0=Sun
+            const start = new Date(today);
+            start.setDate(start.getDate() - 364 - dayOfWeek);
+
+            // Total cells = from start Sunday through today (padded to next Saturday)
+            const totalDays = Math.round((today - start) / 86400000) + 1;
+            const totalWeeks = Math.ceil(totalDays / 7);
+
+            const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            // Month label placeholders (one per column/week)
+            let lastMonth = -1;
+            const labelCells = [];
+            for (let w = 0; w < totalWeeks; w++) {
+                const weekStart = new Date(start);
+                weekStart.setDate(start.getDate() + w * 7);
+                const m = weekStart.getMonth();
+                const label = document.createElement('div');
+                label.className = 'contrib-month-label';
+                label.style.width = '13px';
+                label.style.minWidth = '13px';
+                if (m !== lastMonth) {
+                    label.textContent = MONTH_NAMES[m];
+                    lastMonth = m;
+                }
+                monthLabels.appendChild(label);
+                // gap between columns
+                if (w < totalWeeks - 1) {
+                    const gap = document.createElement('div');
+                    gap.style.width = '3px';
+                    monthLabels.appendChild(gap);
+                }
+            }
+
+            // Build columns of cells
+            for (let w = 0; w < totalWeeks; w++) {
+                const col = document.createElement('div');
+                col.className = 'contrib-col';
+
+                for (let d = 0; d < 7; d++) {
+                    const cellDate = new Date(start);
+                    cellDate.setDate(start.getDate() + w * 7 + d);
+
+                    const cell = document.createElement('div');
+                    cell.className = 'contrib-cell';
+
+                    if (cellDate > today) {
+                        // Future days: invisible placeholder
+                        cell.style.visibility = 'hidden';
+                    } else {
+                        const yyyy = cellDate.getFullYear();
+                        const mm = String(cellDate.getMonth() + 1).padStart(2, '0');
+                        const dd = String(cellDate.getDate()).padStart(2, '0');
+                        const key = `${yyyy}-${mm}-${dd}`;
+                        const val = valueMap[key] || 0;
+                        const level = getLevel(val);
+                        cell.classList.add(`contrib-l${level}`);
+
+                        // Tooltip on hover
+                        const friendlyDate = cellDate.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                        const logText = val > 0
+                            ? (unit === 'completed' ? 'Completed' : `${val} ${unit}`)
+                            : 'No activity';
+
+                        cell.addEventListener('mouseenter', function (e) {
+                            tooltip.textContent = `${logText}  ·  ${friendlyDate}`;
+                            tooltip.style.display = 'block';
+                        });
+                        cell.addEventListener('mousemove', function (e) {
+                            tooltip.style.left = (e.clientX + 14) + 'px';
+                            tooltip.style.top = (e.clientY - 28) + 'px';
+                        });
+                        cell.addEventListener('mouseleave', function () {
+                            tooltip.style.display = 'none';
+                        });
+                    }
+
+                    col.appendChild(cell);
+                }
+
+                grid.appendChild(col);
+            }
+
+            // Auto-scroll to the right (most recent weeks)
+            grid.parentElement.scrollLeft = grid.parentElement.scrollWidth;
+        }
+    });
+</script>
+{% endblock %}

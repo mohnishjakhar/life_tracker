@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Habit Tracker Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-check2-circle text-primary"></i> Habit Tracker</h2>
+</div>
+
+<div class="row g-4">
+    <!-- Active Habits List & Check-in -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-4 fw-bold">Today's Check-in</h5>
+
+                {% if habit_data %}
+                <div class="list-group list-group-flush">
+                    {% for item in habit_data %}
+                    {% set habit = item.habit %}
+                    {% set log = item.today_log %}
+                    <div
+                        class="list-group-item py-3 px-0 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+                        <div>
+                            <h6 class="mb-1 fw-bold">
+                                <a href="{{ url_for('habit.details', habit_id=habit.id) }}"
+                                    class="text-decoration-none text-body">
+                                    {{ habit.name }}
+                                </a>
+                            </h6>
+                            <p class="text-muted small mb-0">{{ habit.description or "No description" }}</p>
+                            <div class="mt-1">
+                                <span class="badge bg-secondary-subtle text-secondary small">
+                                    Target: {{ habit.frequency_per_week }}x / week
+                                </span>
+                                <span class="badge bg-info-subtle text-info small ms-1">
+                                    Streak: {{ item.current_streak }} 🔥
+                                </span>
+                                <span class="badge bg-primary-subtle text-primary small ms-1">
+                                    This week: {{ item.week_logs_count }} / {{ habit.frequency_per_week }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Logging control -->
+                        <div class="d-flex align-items-center gap-2">
+                            {% if habit.measurement_type == 'boolean' %}
+                            <!-- Boolean Toggle Button -->
+                            <button
+                                class="btn {% if log %}btn-success{% else %}btn-outline-success{% endif %} btn-sm quick-log-toggle"
+                                data-habit-id="{{ habit.id }}">
+                                <i class="bi {% if log %}bi-check-circle-fill{% else %}bi-circle{% endif %}"></i>
+                                <span class="toggle-text">{% if log %}Completed{% else %}Mark Done{% endif %}</span>
+                            </button>
+                            {% else %}
+                            <!-- Numeric Log Form -->
+                            <div class="input-group input-group-sm" style="max-width: 200px;">
+                                <input type="number" step="any" class="form-control numeric-value"
+                                    placeholder="{{ habit.measurement_unit }}" value="{{ log.value if log else '' }}"
+                                    id="input-{{ habit.id }}">
+                                <button class="btn btn-outline-primary numeric-log-btn" type="button"
+                                    data-habit-id="{{ habit.id }}">
+                                    Log
+                                </button>
+                            </div>
+                            {% endif %}
+
+                            <a href="{{ url_for('habit.details', habit_id=habit.id) }}"
+                                class="btn btn-sm btn-outline-secondary" title="View details & charts">
+                                <i class="bi bi-bar-chart-fill"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-journals display-4 mb-3"></i>
+                    <p class="mb-0">No active habits. Add a new habit on the right to get started!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if archived_habits %}
+        <div class="card shadow-sm border-0 mb-4 bg-light-subtle">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3 text-muted">Archived Habits</h6>
+                <div class="list-group list-group-flush">
+                    {% for habit in archived_habits %}
+                    <div
+                        class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted text-decoration-line-through">{{ habit.name }}</span>
+                            <span class="badge bg-secondary-subtle text-secondary ms-2">{{ habit.measurement_type
+                                }}</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <form action="{{ url_for('habit.archive_habit', habit_id=habit.id) }}" method="POST">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Restore</button>
+                            </form>
+                            <form action="{{ url_for('habit.delete_habit', habit_id=habit.id) }}" method="POST"
+                                onsubmit="return confirm('Are you sure you want to delete this habit and all its logs permanently?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Add Habit Side Form -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 position-sticky" style="top: 20px;">
+            <div class="card-body">
+                <h5 class="card-title mb-4 fw-bold">Create Habit</h5>
+                <form action="{{ url_for('habit.add_habit') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Habit Name</label>
+                        <input type="text" name="name" class="form-control"
+                            placeholder="e.g. Morning Meditation, Read Book" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description (Optional)</label>
+                        <textarea name="description" class="form-control" rows="2"
+                            placeholder="Briefly describe the habit..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Weekly Target Frequency</label>
+                        <select name="frequency_per_week" class="form-select">
+                            <option value="7">Every day (7x / week)</option>
+                            <option value="6">6 days a week</option>
+                            <option value="5">5 days a week</option>
+                            <option value="4">4 days a week</option>
+                            <option value="3">3 days a week</option>
+                            <option value="2">2 days a week</option>
+                            <option value="1">1 day a week</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Measurement Mode</label>
+                        <select name="measurement_type" id="measurementTypeSelect" class="form-select">
+                            <option value="boolean">Simple Yes / No checkmark</option>
+                            <option value="duration">Time spent (Minutes)</option>
+                            <option value="count">Count (Reps / Times done)</option>
+                            <option value="custom">Custom metric (distance, water intake, etc.)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 d-none" id="customUnitWrapper">
+                        <label class="form-label">Custom Unit Name</label>
+                        <input type="text" name="measurement_unit" id="customUnitInput" class="form-control"
+                            placeholder="e.g. km, glasses, pages" value="completed">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Add Habit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="liveToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive"
+        aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body" id="toastMessage">Log updated successfully.</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const typeSelect = document.getElementById("measurementTypeSelect");
+        const unitWrapper = document.getElementById("customUnitWrapper");
+        const unitInput = document.getElementById("customUnitInput");
+
+        // Dynamically toggle custom unit input display
+        typeSelect.addEventListener("change", function () {
+            const val = typeSelect.value;
+            if (val === "boolean") {
+                unitWrapper.classList.add("d-none");
+                unitInput.value = "completed";
+            } else if (val === "duration") {
+                unitWrapper.classList.add("d-none");
+                unitInput.value = "minutes";
+            } else if (val === "count") {
+                unitWrapper.classList.add("d-none");
+                unitInput.value = "reps";
+            } else {
+                unitWrapper.classList.remove("d-none");
+                unitInput.value = "";
+                unitInput.required = true;
+            }
+        });
+
+        // Toast notifications logic
+        const toastEl = document.getElementById("liveToast");
+        const toast = new bootstrap.Toast(toastEl);
+        const toastMsg = document.getElementById("toastMessage");
+
+        function showNotification(message, type = "success") {
+            toastMsg.innerText = message;
+            toastEl.className = `toast align-items-center text-bg-${type} border-0`;
+            toast.show();
+        }
+
+        // Quick log checkmark toggles (Boolean habits)
+        document.querySelectorAll(".quick-log-toggle").forEach(button => {
+            button.addEventListener("click", function () {
+                const habitId = button.getAttribute("data-habit-id");
+
+                const formData = new FormData();
+                formData.append("habit_id", habitId);
+
+                fetch("{{ url_for('habit.quick_log') }}", {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === "logged") {
+                            button.classList.remove("btn-outline-success");
+                            button.classList.add("btn-success");
+                            button.querySelector("i").className = "bi bi-check-circle-fill";
+                            button.querySelector(".toggle-text").innerText = "Completed";
+                            showNotification("Habit checked off!", "success");
+                        } else if (data.status === "deleted") {
+                            button.classList.remove("btn-success");
+                            button.classList.add("btn-outline-success");
+                            button.querySelector("i").className = "bi bi-circle";
+                            button.querySelector(".toggle-text").innerText = "Mark Done";
+                            showNotification("Habit unchecked.", "warning");
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showNotification("An error occurred. Please try again.", "danger");
+                    });
+            });
+        });
+
+        // Quick log numeric log buttons
+        document.querySelectorAll(".numeric-log-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const habitId = button.getAttribute("data-habit-id");
+                const inputVal = document.getElementById(`input-${habitId}`).value;
+
+                const formData = new FormData();
+                formData.append("habit_id", habitId);
+                formData.append("value", inputVal);
+
+                fetch("{{ url_for('habit.quick_log') }}", {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === "logged" || data.status === "updated") {
+                            showNotification(data.message, "success");
+                        } else {
+                            showNotification(data.message || "Failed to save log.", "danger");
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showNotification("An error occurred. Please try again.", "danger");
+                    });
+            });
+        });
+    });
+</script>
+{% endblock %}

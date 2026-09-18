@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Academic Tracker{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Academic Tracker</h2>
+    <a href="{{ url_for('academic.manage') }}" class="btn btn-outline-primary">Manage Semesters & Subjects</a>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-primary shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-title text-white-50">Overall GPA</h6>
+                <p class="fs-2 mb-0 fw-bold">{{ "%.2f"|format(gpa_overall) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-success shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-title text-white-50">Completed Credits</h6>
+                <p class="fs-2 mb-0 fw-bold">{{ completed_credits }} / {{ total_credits }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-dark shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="card-title text-white-50">Current Subjects</h6>
+                <p class="fs-2 mb-0 fw-bold">{{ courses|length }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- GPA Trend Learning Graph -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 mb-4 h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-4 fw-bold">Learning Graph (GPA Trend)</h5>
+                {% if chart_labels %}
+                <div style="position: relative; height: 320px;">
+                    <canvas id="gpaChart"></canvas>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <p>No semesters added yet. Navigate to "Manage Semesters & Subjects" to start plotting your results!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Study Goals -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 mb-4 h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-3 fw-bold">Study Goals</h5>
+                
+                <form action="{{ url_for('academic.add_goal') }}" method="POST" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" name="title" class="form-control" placeholder="New goal title..." required>
+                        <input type="date" name="target_date" class="form-control" style="max-width: 130px;" required>
+                        <button type="submit" class="btn btn-primary">Add</button>
+                    </div>
+                </form>
+
+                <ul class="list-group list-group-flush" style="max-height: 280px; overflow-y: auto;">
+                    {% for goal in study_goals %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div class="d-flex align-items-center">
+                            <form action="{{ url_for('academic.toggle_goal', goal_id=goal.id) }}" method="POST" class="me-2 d-inline">
+                                <input type="checkbox" class="form-check-input" onChange="this.form.submit()" {% if goal.is_completed %}checked{% endif %}>
+                            </form>
+                            <span class="{% if goal.is_completed %}text-decoration-line-through text-muted{% endif %}">
+                                {{ goal.title }}
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <small class="text-muted">{{ goal.target_date }}</small>
+                            <form action="{{ url_for('academic.delete_goal', goal_id=goal.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-sm text-danger border-0 p-0 bg-transparent">&times;</button>
+                            </form>
+                        </div>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-center text-muted border-0 py-4">No goals configured yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-1">
+    <!-- Upcoming Tests -->
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3 fw-bold">Upcoming Assessments & Tests</h5>
+
+                <form action="{{ url_for('academic.add_test') }}" method="POST" class="row g-2 mb-4">
+                    <div class="col-sm-4">
+                        <select name="course_id" class="form-select" required>
+                            <option value="" disabled selected>-- Select Subject --</option>
+                            {% for course in courses %}
+                            <option value="{{ course.id }}">{{ course.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-4">
+                        <input type="text" name="name" class="form-control" placeholder="Test Name (e.g. Midterm 1)" required>
+                    </div>
+                    <div class="col-sm-2">
+                        <input type="date" name="date" class="form-control" required>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="submit" class="btn btn-primary w-100">Schedule</button>
+                    </div>
+                </form>
+
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Test Name</th>
+                                <th>Date</th>
+                                <th>Action / Marks Obtained</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for test in upcoming_tests %}
+                            <tr>
+                                <td><strong>{{ test.course.name }}</strong></td>
+                                <td>{{ test.name }}</td>
+                                <td><span class="badge bg-secondary">{{ test.date }}</span></td>
+                                <td>
+                                    <!-- Inline form to submit marks and mark complete -->
+                                    <form action="{{ url_for('academic.complete_test', test_id=test.id) }}" method="POST" class="d-flex align-items-center gap-1">
+                                        <input type="number" step="0.1" name="marks_obtained" class="form-control form-control-sm" style="max-width: 90px;" placeholder="Marks" required>
+                                        <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                    </form>
+                                </td>
+                                <td class="text-end">
+                                    <form action="{{ url_for('academic.delete_test', test_id=test.id) }}" method="POST" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">No upcoming tests scheduled.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Subjects List -->
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3 fw-bold">Subjects & Results Summary</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Semester</th>
+                                <th>Credits</th>
+                                <th>Marks / GP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for course in courses %}
+                            <tr>
+                                <td>{{ course.name }}</td>
+                                <td>{{ course.semester.name if course.semester else "No Semester" }}</td>
+                                <td>{{ course.credits }}</td>
+                                <td>
+                                    {% if course.grade_point is not none %}
+                                    <span class="badge bg-primary">{{ course.grade or "" }} ({{ course.grade_point }} GP)</span>
+                                    {% elif course.marks_obtained is not none %}
+                                    <span class="badge bg-secondary">{{ course.marks_obtained }} / {{ course.max_marks }}</span>
+                                    {% else %}
+                                    <span class="text-muted">In Progress</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">No subjects added yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if chart_labels %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('gpaChart').getContext('2d');
+        
+        // Dynamic chart labels and data passed from flask
+        const labels = {{ chart_labels | tojson }};
+        const data = {{ chart_gpas | tojson }};
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Semester GPA',
+                    data: data,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#0d6efd',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 10,  // Allows scaling for both 4.0 or 10.0 scale systems
+                        ticks: {
+                            stepSize: 1
+                        },
+                        grid: {
+                            color: '#eef0f3'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

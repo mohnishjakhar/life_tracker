@@ -1,0 +1,167 @@
+/* ===== Life Tracker – Custom Styles ===== */
+
+/* Smooth theme transition */
+html {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+    background-color: #f8f9fa;
+}
+
+/* Dark mode body override */
+[data-bs-theme="dark"] body {
+    background-color: #1a1d21;
+}
+
+/* Navbar stays dark in both modes */
+.navbar {
+    background-color: #212529 !important;
+}
+
+/* Theme toggle button styling */
+#themeToggle {
+    font-size: 1.1rem;
+    color: #ffffffb3;
+    transition: color 0.2s ease, transform 0.2s ease;
+    border: none;
+    background: transparent;
+}
+
+#themeToggle:hover {
+    color: #ffc107;
+    transform: scale(1.15);
+}
+
+/* Card smooth transitions */
+.card {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Dark mode card shadows */
+[data-bs-theme="dark"] .card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Table hover effect */
+.table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+/* Dashboard habit sparkline cells */
+.sparkline-cell {
+    width: 12px;
+    height: 22px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+.sparkline-done  { background-color: #40c463; }
+.sparkline-empty { background-color: #dee2e6; }
+[data-bs-theme="dark"] .sparkline-empty { background-color: #2d333b; }
+
+/* ===== Health Tracker Styles ===== */
+
+/* Health navigation tabs */
+.health-nav-tabs .nav-link {
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+    padding: 0.65rem 1.15rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+.health-nav-tabs .nav-link:hover {
+    color: var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.06);
+}
+.health-nav-tabs .nav-link.active {
+    color: var(--bs-primary);
+    font-weight: 700;
+    background-color: rgba(13, 110, 253, 0.12);
+    border-color: rgba(13, 110, 253, 0.25);
+}
+
+/* Water glass hydration items */
+.water-glass-icon {
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+.water-glass-icon:hover {
+    transform: scale(1.25);
+}
+.water-glass-filled {
+    color: #0dcaf0;
+}
+.water-glass-empty {
+    color: #ced4da;
+}
+[data-bs-theme="dark"] .water-glass-empty {
+    color: #495057;
+}
+
+/* BMI Category Scale Bar */
+.bmi-bar-container {
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #0dcaf0 0%, #0dcaf0 18.5%, #198754 18.5%, #198754 25%, #ffc107 25%, #ffc107 30%, #dc3545 30%, #dc3545 100%);
+    position: relative;
+    margin: 1.5rem 0 0.5rem 0;
+}
+.bmi-pointer {
+    position: absolute;
+    top: -8px;
+    width: 14px;
+    height: 24px;
+    background: #212529;
+    border: 2px solid #fff;
+    border-radius: 3px;
+    transform: translateX(-50%);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+[data-bs-theme="dark"] .bmi-pointer {
+    background: #f8f9fa;
+    border: 2px solid #1a1d21;
+}
+
+/* Food group tags */
+.food-tag-badge {
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 20px;
+    border: 1px solid var(--bs-border-color);
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+    transition: all 0.15s ease;
+}
+.food-tag-badge:hover, .food-tag-badge.active {
+    background-color: var(--bs-primary);
+    color: #fff;
+    border-color: var(--bs-primary);
+}
+
+/* Lab Test Reference Gauge */
+.lab-ref-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+}
+
+/* Stat card highlights */
+.stat-card-accent {
+    border-left: 4px solid var(--bs-primary);
+}
+.stat-card-accent.accent-success {
+    border-left-color: var(--bs-success);
+}
+.stat-card-accent.accent-warning {
+    border-left-color: var(--bs-warning);
+}
+.stat-card-accent.accent-danger {
+    border-left-color: var(--bs-danger);
+}
+.stat-card-accent.accent-info {
+    border-left-color: var(--bs-info);
+}
