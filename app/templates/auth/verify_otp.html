@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}{% if purpose == 'reset_password' %}Verify Password Reset OTP{% else %}Verify Email{% endif %} – Life Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6 col-lg-5">
+        <div class="card auth-card border-0 p-4">
+            <div class="text-center mb-4">
+                <div class="auth-header-icon bg-warning-subtle text-warning mx-auto">
+                    <i class="bi bi-shield-lock-fill"></i>
+                </div>
+                <h3 class="fw-bold">
+                    {% if purpose == 'reset_password' %}
+                        Password Reset Verification
+                    {% else %}
+                        Verify Your Email
+                    {% endif %}
+                </h3>
+                <p class="text-muted small mb-1">
+                    Enter the 6-digit verification code sent to:
+                </p>
+                <div class="badge bg-primary-subtle text-primary px-3 py-2 fs-6 fw-normal">
+                    <i class="bi bi-envelope me-1"></i> {{ email }}
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.verify_otp') }}" id="otpForm">
+                <input type="hidden" name="email" value="{{ email }}">
+                <input type="hidden" name="purpose" value="{{ purpose }}">
+
+                <!-- 6-digit split input boxes -->
+                <div class="otp-inputs">
+                    <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="otp-digit" name="otp_1" id="otp_1" autofocus required autocomplete="off">
+                    <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="otp-digit" name="otp_2" id="otp_2" required autocomplete="off">
+                    <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="otp-digit" name="otp_3" id="otp_3" required autocomplete="off">
+                    <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="otp-digit" name="otp_4" id="otp_4" required autocomplete="off">
+                    <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="otp-digit" name="otp_5" id="otp_5" required autocomplete="off">
+                    <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" class="otp-digit" name="otp_6" id="otp_6" required autocomplete="off">
+                </div>
+
+                <div class="text-center mb-4">
+                    <small class="text-muted">
+                        <i class="bi bi-clock-history me-1"></i> Code is valid for 10 minutes
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="verifyBtn">
+                    <i class="bi bi-check-circle me-1"></i> Verify Code
+                </button>
+            </form>
+
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                <form method="POST" action="{{ url_for('auth.resend_otp') }}" class="d-inline">
+                    <input type="hidden" name="email" value="{{ email }}">
+                    <input type="hidden" name="purpose" value="{{ purpose }}">
+                    <button type="submit" class="btn btn-link text-decoration-none p-0 small fw-semibold" id="resendBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i> Resend Code <span id="resendTimerText"></span>
+                    </button>
+                </form>
+
+                <a href="{{ url_for('auth.login') }}" class="small text-muted text-decoration-none">
+                    Back to Login
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const inputs = document.querySelectorAll(".otp-digit");
+    const form = document.getElementById("otpForm");
+
+    inputs.forEach((input, index) => {
+        // Auto focus next input on keyup
+        input.addEventListener("input", (e) => {
+            const val = e.target.value;
+            // Only allow digits
+            if (!/^\d*$/.test(val)) {
+                e.target.value = "";
+                return;
+            }
+            if (val.length === 1 && index < inputs.length - 1) {
+                inputs[index + 1].focus();
+            }
+            
+            // Auto submit if all 6 filled
+            const fullCode = Array.from(inputs).map(i => i.value).join("");
+            if (fullCode.length === 6) {
+                // slight delay for UI feel
+                setTimeout(() => form.submit(), 150);
+            }
+        });
+
+        // Handle backspace navigation
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Backspace" && !input.value && index > 0) {
+                inputs[index - 1].focus();
+            }
+        });
+
+        // Handle paste event (e.g., pasting "123456")
+        input.addEventListener("paste", (e) => {
+            e.preventDefault();
+            const pasted = (e.clipboardData || window.clipboardData).getData("text").trim();
+            if (/^\d{6}$/.test(pasted)) {
+                pasted.split("").forEach((char, i) => {
+                    if (inputs[i]) inputs[i].value = char;
+                });
+                inputs[5].focus();
+                setTimeout(() => form.submit(), 150);
+            }
+        });
+    });
+
+    // Optional 30-second cooldown on resend button
+    const resendBtn = document.getElementById("resendBtn");
+    const resendTimerText = document.getElementById("resendTimerText");
+    let cooldown = 30;
+    
+    function startCooldown() {
+        resendBtn.disabled = true;
+        resendBtn.classList.add("text-muted");
+        const interval = setInterval(() => {
+            cooldown--;
+            if (cooldown <= 0) {
+                clearInterval(interval);
+                resendBtn.disabled = false;
+                resendBtn.classList.remove("text-muted");
+                resendTimerText.textContent = "";
+            } else {
+                resendTimerText.textContent = `(${cooldown}s)`;
+            }
+        }, 1000);
+    }
+    startCooldown();
+});
+</script>
+{% endblock %}

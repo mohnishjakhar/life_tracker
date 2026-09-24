@@ -22,6 +22,7 @@ def create_app(config_class=Config):
 
     # Import models so Flask-Migrate can detect them
     from app.models.user import User  # noqa: F401
+    from app.models.otp import EmailOTP  # noqa: F401
     from app.models import finance  # noqa: F401
     from app.models import academic  # noqa: F401
     from app.models import habit  # noqa: F401
