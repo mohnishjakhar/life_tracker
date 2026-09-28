@@ -45,7 +45,7 @@
         background-color: #21262d;
     }
 
-    /* Level 1-4 = light → dark green */
+    /* Level 1-4 = light → dark green (Positive) */
     .contrib-l1 {
         background-color: #9be9a8;
     }
@@ -76,6 +76,39 @@
 
     [data-bs-theme="dark"] .contrib-l4 {
         background-color: #39d353;
+    }
+
+    /* Level 1-4 = light → dark red (Negative) */
+    .contrib-neg-l1 {
+        background-color: #ffc9c9;
+    }
+
+    .contrib-neg-l2 {
+        background-color: #ff8787;
+    }
+
+    .contrib-neg-l3 {
+        background-color: #fa5252;
+    }
+
+    .contrib-neg-l4 {
+        background-color: #c92a2a;
+    }
+
+    [data-bs-theme="dark"] .contrib-neg-l1 {
+        background-color: #e63946;
+    }
+
+    [data-bs-theme="dark"] .contrib-neg-l2 {
+        background-color: #b72b36;
+    }
+
+    [data-bs-theme="dark"] .contrib-neg-l3 {
+        background-color: #781c22;
+    }
+
+    [data-bs-theme="dark"] .contrib-neg-l4 {
+        background-color: #491217;
     }
 
     .contrib-month-labels {
@@ -141,7 +174,18 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2 class="mb-1">{{ habit.name }}</h2>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h2 class="mb-0">{{ habit.name }}</h2>
+            {% if habit.habit_type == 'negative' %}
+            <span class="badge bg-danger-subtle text-danger">
+                <i class="bi bi-dash-circle"></i> Quit Habit
+            </span>
+            {% else %}
+            <span class="badge bg-success-subtle text-success">
+                <i class="bi bi-plus-circle"></i> Build Habit
+            </span>
+            {% endif %}
+        </div>
         <p class="text-muted mb-0">{{ habit.description or "No description provided." }}</p>
     </div>
     <div class="d-flex gap-2">
@@ -160,7 +204,9 @@
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
         <div class="card shadow-sm border-0 text-center py-3">
-            <h3 class="fw-bold text-success mb-1">{{ current_streak }} 🔥</h3>
+            <h3
+                class="fw-bold {% if habit.habit_type == 'negative' %}text-danger{% else %}text-success{% endif %} mb-1">
+                {{ current_streak }} 🔥</h3>
             <span class="text-muted small">Current Streak</span>
         </div>
     </div>
@@ -207,10 +253,18 @@
                     <div class="contrib-legend">
                         <span>Less</span>
                         <div class="contrib-cell contrib-l0"></div>
-                        <div class="contrib-cell contrib-l1"></div>
-                        <div class="contrib-cell contrib-l2"></div>
-                        <div class="contrib-cell contrib-l3"></div>
-                        <div class="contrib-cell contrib-l4"></div>
+                        <div
+                            class="contrib-cell {% if habit.habit_type == 'negative' %}contrib-neg-l1{% else %}contrib-l1{% endif %}">
+                        </div>
+                        <div
+                            class="contrib-cell {% if habit.habit_type == 'negative' %}contrib-neg-l2{% else %}contrib-l2{% endif %}">
+                        </div>
+                        <div
+                            class="contrib-cell {% if habit.habit_type == 'negative' %}contrib-neg-l3{% else %}contrib-l3{% endif %}">
+                        </div>
+                        <div
+                            class="contrib-cell {% if habit.habit_type == 'negative' %}contrib-neg-l4{% else %}contrib-l4{% endif %}">
+                        </div>
                         <span>More</span>
                     </div>
                 </div>
@@ -277,7 +331,11 @@
                         <input type="text" name="notes" class="form-control"
                             placeholder="e.g. Felt great, slow progress">
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Save Log</button>
+                    {% if habit.habit_type == 'negative' %}
+                    <button type="submit" class="btn btn-danger w-100">Log Activity</button>
+                    {% else %}
+                    <button type="submit" class="btn btn-success w-100">Save Log</button>
+                    {% endif %}
                 </form>
             </div>
         </div>
@@ -328,13 +386,14 @@
         fetch("{{ url_for('habit.get_habit_stats', habit_id=habit.id) }}")
             .then(res => res.json())
             .then(data => {
+                const isNegative = (data.habit_type === 'negative');
+
                 // ── Build value lookup map from full history (bug fix: use all_logged_values)
                 const valueMap = data.all_logged_values || {};
                 // Also overlay the 30-day precise values
                 data.dates.forEach((d, i) => { if (data.values[i] > 0) valueMap[d] = data.values[i]; });
 
                 // ── Compute intensity levels ──
-                // max value in the map to normalise into 4 levels
                 const vals = Object.values(valueMap).filter(v => v > 0);
                 const maxVal = vals.length > 0 ? Math.max(...vals) : 1;
 
@@ -349,11 +408,16 @@
                 }
 
                 // ── Build 365-day heatmap ──
-                buildHeatmap(valueMap, getLevel, data.measurement_unit);
+                buildHeatmap(valueMap, getLevel, data.measurement_unit, isNegative);
 
                 // ── Chart.js trend graph ──
                 const ctx = document.getElementById('habitChart').getContext('2d');
                 const isBoolean = data.measurement_type === 'boolean';
+                const mainColor = isNegative ? '#e63946' : '#40c463';
+                const fillColor = isNegative
+                    ? (isBoolean ? 'rgba(230,57,70,0.4)' : 'rgba(230,57,70,0.1)')
+                    : (isBoolean ? 'rgba(64,196,99,0.4)' : 'rgba(64,196,99,0.1)');
+                const pointColor = isNegative ? '#c92a2a' : '#216e39';
 
                 new Chart(ctx, {
                     type: isBoolean ? 'bar' : 'line',
@@ -363,14 +427,14 @@
                             return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                         }),
                         datasets: [{
-                            label: isBoolean ? 'Completed' : `Value (${data.measurement_unit})`,
+                            label: isBoolean ? (isNegative ? 'Logged' : 'Completed') : `Value (${data.measurement_unit})`,
                             data: data.values,
-                            borderColor: '#40c463',
-                            backgroundColor: isBoolean ? 'rgba(64,196,99,0.4)' : 'rgba(64,196,99,0.1)',
+                            borderColor: mainColor,
+                            backgroundColor: fillColor,
                             borderWidth: 2.5,
                             fill: !isBoolean,
                             tension: 0.3,
-                            pointBackgroundColor: '#216e39',
+                            pointBackgroundColor: pointColor,
                             pointRadius: isBoolean ? 0 : 4
                         }]
                     },
@@ -396,10 +460,11 @@
         // ─────────────────────────────────────────────
         //  GitHub-style Heatmap builder
         // ─────────────────────────────────────────────
-        function buildHeatmap(valueMap, getLevel, unit) {
+        function buildHeatmap(valueMap, getLevel, unit, isNegative) {
             const grid = document.getElementById('heatmapGrid');
             const monthLabels = document.getElementById('heatmapMonthLabels');
             const tooltip = document.getElementById('contribTooltip');
+            const prefix = isNegative ? 'contrib-neg-l' : 'contrib-l';
 
             // Build array of last 365 days starting from a Sunday
             const today = new Date();
@@ -418,7 +483,6 @@
 
             // Month label placeholders (one per column/week)
             let lastMonth = -1;
-            const labelCells = [];
             for (let w = 0; w < totalWeeks; w++) {
                 const weekStart = new Date(start);
                 weekStart.setDate(start.getDate() + w * 7);
@@ -432,7 +496,6 @@
                     lastMonth = m;
                 }
                 monthLabels.appendChild(label);
-                // gap between columns
                 if (w < totalWeeks - 1) {
                     const gap = document.createElement('div');
                     gap.style.width = '3px';
@@ -453,7 +516,6 @@
                     cell.className = 'contrib-cell';
 
                     if (cellDate > today) {
-                        // Future days: invisible placeholder
                         cell.style.visibility = 'hidden';
                     } else {
                         const yyyy = cellDate.getFullYear();
@@ -462,12 +524,12 @@
                         const key = `${yyyy}-${mm}-${dd}`;
                         const val = valueMap[key] || 0;
                         const level = getLevel(val);
-                        cell.classList.add(`contrib-l${level}`);
+                        cell.classList.add(level === 0 ? 'contrib-l0' : `${prefix}${level}`);
 
                         // Tooltip on hover
                         const friendlyDate = cellDate.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
                         const logText = val > 0
-                            ? (unit === 'completed' ? 'Completed' : `${val} ${unit}`)
+                            ? (unit === 'completed' ? (isNegative ? 'Logged' : 'Completed') : `${val} ${unit}`)
                             : 'No activity';
 
                         cell.addEventListener('mouseenter', function (e) {

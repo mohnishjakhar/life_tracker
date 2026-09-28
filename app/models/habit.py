@@ -12,6 +12,7 @@ class Habit(db.Model):
     frequency_per_week = db.Column(db.Integer, nullable=False, default=7)
     measurement_type = db.Column(db.String(20), nullable=False, default="boolean")  # boolean, duration, count, custom
     measurement_unit = db.Column(db.String(50), nullable=False, default="completed")  # e.g., minutes, reps, glasses
+    habit_type = db.Column(db.String(20), nullable=False, default="positive")  # positive (to build), negative (to leave/quit)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
@@ -25,6 +26,7 @@ class Habit(db.Model):
         frequency_per_week: int = 7,
         measurement_type: str = "boolean",
         measurement_unit: str = "completed",
+        habit_type: str = "positive",
         is_active: bool = True,
         **kwargs,
     ):
@@ -35,6 +37,7 @@ class Habit(db.Model):
             frequency_per_week=frequency_per_week,
             measurement_type=measurement_type,
             measurement_unit=measurement_unit,
+            habit_type=habit_type,
             is_active=is_active,
             **kwargs,
         )

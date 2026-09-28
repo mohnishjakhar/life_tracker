@@ -112,6 +112,10 @@ def add_habit():
     frequency_per_week = request.form.get("frequency_per_week", type=int)
     measurement_type = request.form.get("measurement_type", "boolean")
     measurement_unit = request.form.get("measurement_unit", "completed")
+    habit_type = request.form.get("habit_type", "positive")
+
+    if habit_type not in ["positive", "negative"]:
+        habit_type = "positive"
 
     if not name:
         flash("Habit name is required.", "danger")
@@ -131,7 +135,8 @@ def add_habit():
         description=description,
         frequency_per_week=frequency_per_week,
         measurement_type=measurement_type,
-        measurement_unit=measurement_unit
+        measurement_unit=measurement_unit,
+        habit_type=habit_type
     )
 
     db.session.add(habit)
@@ -335,6 +340,7 @@ def get_habit_stats(habit_id):
         "all_logged_dates": list(all_logs.keys()),
         "all_logged_values": all_logs,          # <-- full value map for heatmap intensity
         "measurement_type": habit.measurement_type,
-        "measurement_unit": habit.measurement_unit
+        "measurement_unit": habit.measurement_unit,
+        "habit_type": habit.habit_type
     })
 

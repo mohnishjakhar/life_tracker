@@ -17,15 +17,27 @@
                     {% for item in habit_data %}
                     {% set habit = item.habit %}
                     {% set log = item.today_log %}
+                    {% set is_negative = (habit.habit_type == 'negative') %}
                     <div
                         class="list-group-item py-3 px-0 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
                         <div>
-                            <h6 class="mb-1 fw-bold">
-                                <a href="{{ url_for('habit.details', habit_id=habit.id) }}"
-                                    class="text-decoration-none text-body">
-                                    {{ habit.name }}
-                                </a>
-                            </h6>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="mb-0 fw-bold">
+                                    <a href="{{ url_for('habit.details', habit_id=habit.id) }}"
+                                        class="text-decoration-none text-body">
+                                        {{ habit.name }}
+                                    </a>
+                                </h6>
+                                {% if is_negative %}
+                                <span class="badge bg-danger-subtle text-danger small">
+                                    <i class="bi bi-dash-circle"></i> Quit Habit
+                                </span>
+                                {% else %}
+                                <span class="badge bg-success-subtle text-success small">
+                                    <i class="bi bi-plus-circle"></i> Build Habit
+                                </span>
+                                {% endif %}
+                            </div>
                             <p class="text-muted small mb-0">{{ habit.description or "No description" }}</p>
                             <div class="mt-1">
                                 <span class="badge bg-secondary-subtle text-secondary small">
@@ -44,22 +56,38 @@
                         <div class="d-flex align-items-center gap-2">
                             {% if habit.measurement_type == 'boolean' %}
                             <!-- Boolean Toggle Button -->
+                            {% if is_negative %}
+                            <button
+                                class="btn {% if log %}btn-danger{% else %}btn-outline-danger{% endif %} btn-sm quick-log-toggle"
+                                data-habit-id="{{ habit.id }}" data-habit-type="negative">
+                                <i class="bi {% if log %}bi-exclamation-circle-fill{% else %}bi-circle{% endif %}"></i>
+                                <span class="toggle-text">{% if log %}Logged{% else %}Log Habit{% endif %}</span>
+                            </button>
+                            {% else %}
                             <button
                                 class="btn {% if log %}btn-success{% else %}btn-outline-success{% endif %} btn-sm quick-log-toggle"
-                                data-habit-id="{{ habit.id }}">
+                                data-habit-id="{{ habit.id }}" data-habit-type="positive">
                                 <i class="bi {% if log %}bi-check-circle-fill{% else %}bi-circle{% endif %}"></i>
                                 <span class="toggle-text">{% if log %}Completed{% else %}Mark Done{% endif %}</span>
                             </button>
+                            {% endif %}
                             {% else %}
                             <!-- Numeric Log Form -->
-                            <div class="input-group input-group-sm" style="max-width: 200px;">
+                            <div class="input-group input-group-sm" style="max-width: 220px;">
                                 <input type="number" step="any" class="form-control numeric-value"
-                                    placeholder="{{ habit.measurement_unit }}" value="{{ log.value if log else '' }}"
+                                    placeholder="{{ habit.measurement_unit }}"
                                     id="input-{{ habit.id }}">
-                                <button class="btn btn-outline-primary numeric-log-btn" type="button"
-                                    data-habit-id="{{ habit.id }}">
+                                {% if is_negative %}
+                                <button class="btn btn-outline-danger numeric-log-btn" type="button"
+                                    data-habit-id="{{ habit.id }}" data-habit-type="negative">
                                     Log
                                 </button>
+                                {% else %}
+                                <button class="btn btn-outline-success numeric-log-btn" type="button"
+                                    data-habit-id="{{ habit.id }}" data-habit-type="positive">
+                                    Log
+                                </button>
+                                {% endif %}
                             </div>
                             {% endif %}
 
@@ -90,8 +118,8 @@
                         class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center">
                         <div>
                             <span class="text-muted text-decoration-line-through">{{ habit.name }}</span>
-                            <span class="badge bg-secondary-subtle text-secondary ms-2">{{ habit.measurement_type
-                                }}</span>
+                            <span class="badge {% if habit.habit_type == 'negative' %}bg-danger-subtle text-danger{% else %}bg-success-subtle text-success{% endif %} ms-1">{{ 'Quit' if habit.habit_type == 'negative' else 'Build' }}</span>
+                            <span class="badge bg-secondary-subtle text-secondary ms-1">{{ habit.measurement_type }}</span>
                         </div>
                         <div class="d-flex gap-2">
                             <form action="{{ url_for('habit.archive_habit', habit_id=habit.id) }}" method="POST">
@@ -116,10 +144,33 @@
             <div class="card-body">
                 <h5 class="card-title mb-4 fw-bold">Create Habit</h5>
                 <form action="{{ url_for('habit.add_habit') }}" method="POST">
+                    <!-- Habit Type Selection -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Habit Type</label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="habit_type" id="habitTypePositive" value="positive" checked>
+                                <label class="btn btn-outline-success w-100 text-center py-2" for="habitTypePositive">
+                                    <i class="bi bi-plus-circle-fill d-block fs-5 mb-1 text-success"></i>
+                                    <span class="fw-bold d-block small">Positive</span>
+                                    <span class="text-muted" style="font-size: 0.72rem;">Want to build</span>
+                                </label>
+                            </div>
+                            <div class="col-6">
+                                <input type="radio" class="btn-check" name="habit_type" id="habitTypeNegative" value="negative">
+                                <label class="btn btn-outline-danger w-100 text-center py-2" for="habitTypeNegative">
+                                    <i class="bi bi-dash-circle-fill d-block fs-5 mb-1 text-danger"></i>
+                                    <span class="fw-bold d-block small">Negative</span>
+                                    <span class="text-muted" style="font-size: 0.72rem;">Want to leave</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Habit Name</label>
                         <input type="text" name="name" class="form-control"
-                            placeholder="e.g. Morning Meditation, Read Book" required>
+                            placeholder="e.g. Morning Meditation, Quit Smoking" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description (Optional)</label>
@@ -150,7 +201,7 @@
                     <div class="mb-3 d-none" id="customUnitWrapper">
                         <label class="form-label">Custom Unit Name</label>
                         <input type="text" name="measurement_unit" id="customUnitInput" class="form-control"
-                            placeholder="e.g. km, glasses, pages" value="completed">
+                            placeholder="e.g. km, glasses, cigarettes" value="completed">
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Add Habit</button>
                 </form>
@@ -212,6 +263,10 @@
         document.querySelectorAll(".quick-log-toggle").forEach(button => {
             button.addEventListener("click", function () {
                 const habitId = button.getAttribute("data-habit-id");
+                const habitType = button.getAttribute("data-habit-type") || "positive";
+                const isNegative = habitType === "negative";
+                const activeClass = isNegative ? "btn-danger" : "btn-success";
+                const outlineClass = isNegative ? "btn-outline-danger" : "btn-outline-success";
 
                 const formData = new FormData();
                 formData.append("habit_id", habitId);
@@ -226,17 +281,17 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.status === "logged") {
-                            button.classList.remove("btn-outline-success");
-                            button.classList.add("btn-success");
-                            button.querySelector("i").className = "bi bi-check-circle-fill";
-                            button.querySelector(".toggle-text").innerText = "Completed";
-                            showNotification("Habit checked off!", "success");
+                            button.classList.remove(outlineClass);
+                            button.classList.add(activeClass);
+                            button.querySelector("i").className = isNegative ? "bi bi-exclamation-circle-fill" : "bi bi-check-circle-fill";
+                            button.querySelector(".toggle-text").innerText = isNegative ? "Logged" : "Completed";
+                            showNotification(isNegative ? "Habit activity logged." : "Habit checked off!", isNegative ? "warning" : "success");
                         } else if (data.status === "deleted") {
-                            button.classList.remove("btn-success");
-                            button.classList.add("btn-outline-success");
+                            button.classList.remove(activeClass);
+                            button.classList.add(outlineClass);
                             button.querySelector("i").className = "bi bi-circle";
-                            button.querySelector(".toggle-text").innerText = "Mark Done";
-                            showNotification("Habit unchecked.", "warning");
+                            button.querySelector(".toggle-text").innerText = isNegative ? "Log Habit" : "Mark Done";
+                            showNotification("Habit log removed.", "info");
                         }
                     })
                     .catch(err => {
@@ -250,7 +305,15 @@
         document.querySelectorAll(".numeric-log-btn").forEach(button => {
             button.addEventListener("click", function () {
                 const habitId = button.getAttribute("data-habit-id");
-                const inputVal = document.getElementById(`input-${habitId}`).value;
+                const habitType = button.getAttribute("data-habit-type") || "positive";
+                const isNegative = habitType === "negative";
+                const inputEl = document.getElementById(`input-${habitId}`);
+                const inputVal = inputEl.value;
+
+                if (!inputVal && inputVal !== "0") {
+                    showNotification("Please enter a value to log.", "warning");
+                    return;
+                }
 
                 const formData = new FormData();
                 formData.append("habit_id", habitId);
@@ -266,7 +329,9 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.status === "logged" || data.status === "updated") {
-                            showNotification(data.message, "success");
+                            // Make input empty after pressing log button
+                            inputEl.value = "";
+                            showNotification(data.message, isNegative ? "warning" : "success");
                         } else {
                             showNotification(data.message || "Failed to save log.", "danger");
                         }
@@ -275,6 +340,18 @@
                         console.error(err);
                         showNotification("An error occurred. Please try again.", "danger");
                     });
+            });
+        });
+
+        // Allow pressing Enter in numeric input to trigger the log button
+        document.querySelectorAll(".numeric-value").forEach(input => {
+            input.addEventListener("keydown", function (e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    const habitId = input.id.replace("input-", "");
+                    const btn = document.querySelector(`.numeric-log-btn[data-habit-id="${habitId}"]`);
+                    if (btn) btn.click();
+                }
             });
         });
     });

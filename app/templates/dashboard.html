@@ -14,7 +14,8 @@
     <div class="col-12">
         <h5 class="fw-bold text-muted d-flex align-items-center gap-2 mb-2">
             <i class="bi bi-wallet2"></i> Finance
-            <a href="{{ url_for('finance.list_transactions') }}" class="btn btn-sm btn-outline-secondary ms-auto">View All</a>
+            <a href="{{ url_for('finance.list_transactions') }}" class="btn btn-sm btn-outline-secondary ms-auto">View
+                All</a>
         </h5>
     </div>
 </div>
@@ -109,7 +110,8 @@
                             <span class="fw-bold small">{{ test.name }}</span>
                             <span class="text-muted small ms-1">– {{ test.course.name }}</span>
                         </div>
-                        <span class="badge {% if (test.date - today).days <= 2 %}bg-danger{% elif (test.date - today).days <= 5 %}bg-warning text-dark{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                        <span
+                            class="badge {% if (test.date - today).days <= 2 %}bg-danger{% elif (test.date - today).days <= 5 %}bg-warning text-dark{% else %}bg-secondary-subtle text-secondary{% endif %}">
                             {% set diff = (test.date - today).days %}
                             {% if diff == 0 %}Today{% elif diff == 1 %}Tomorrow{% else %}{{ diff }}d{% endif %}
                         </span>
@@ -125,7 +127,7 @@
         <!-- Pending Goals -->
         <div class="card border-0 shadow-sm">
             <div class="card-body py-3">
-                <p class="small fw-bold text-muted mb-2">🎯 Open Study Goals</p>
+                <p class="small fw-bold text-muted mb-2">🎯 Study Goals</p>
                 {% if academic.pending_goals %}
                 <ul class="list-unstyled mb-0">
                     {% for goal in academic.pending_goals %}
@@ -155,7 +157,8 @@
                 {% set pct = ((habits.done_today / habits.total_active) * 100)|int if habits.total_active > 0 else 0 %}
                 <div style="width: 70px; height: 70px; flex-shrink: 0; position: relative;">
                     <canvas id="habitDonutChart"></canvas>
-                    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:700;font-size:0.85rem;">
+                    <div
+                        style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-weight:700;font-size:0.85rem;">
                         {{ pct }}%
                     </div>
                 </div>
@@ -180,23 +183,28 @@
             <div class="card-body py-2 px-3">
                 <p class="small fw-bold text-muted mb-2">This Week's Progress</p>
                 {% for row in habits.rows %}
-                <div class="d-flex align-items-center gap-2 py-2 {% if not loop.last %}border-bottom border-opacity-25{% endif %}">
+                <div
+                    class="d-flex align-items-center gap-2 py-2 {% if not loop.last %}border-bottom border-opacity-25{% endif %}">
                     <!-- Done today indicator -->
-                    <i class="bi {% if row.done_today %}bi-check-circle-fill text-success{% else %}bi-circle text-muted{% endif %} flex-shrink-0"></i>
+                    <i
+                        class="bi {% if row.done_today %}bi-check-circle-fill text-success{% else %}bi-circle text-muted{% endif %} flex-shrink-0"></i>
                     <!-- Name -->
-                    <a href="{{ url_for('habit.details', habit_id=row.habit.id) }}" class="text-body text-decoration-none small fw-bold" style="min-width: 110px; max-width: 130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <a href="{{ url_for('habit.details', habit_id=row.habit.id) }}"
+                        class="text-body text-decoration-none small fw-bold"
+                        style="min-width: 110px; max-width: 130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                         {{ row.habit.name }}
                     </a>
                     <!-- 7-day sparkline boxes -->
                     <div class="d-flex gap-1 ms-auto">
                         {% for v in row.week_done %}
                         <div class="sparkline-cell {% if v %}sparkline-done{% else %}sparkline-empty{% endif %}"
-                             style="{% if loop.last %}outline:2px solid {% if v %}#216e39{% else %}var(--bs-border-color){% endif %};{% endif %}">
+                            style="{% if loop.last %}outline:2px solid {% if v %}#216e39{% else %}var(--bs-border-color){% endif %};{% endif %}">
                         </div>
                         {% endfor %}
                     </div>
                     <!-- frequency badge -->
-                    <span class="text-muted" style="font-size:0.7rem; flex-shrink:0;">{{ row.week_done | sum }}/{{ row.habit.frequency_per_week }}</span>
+                    <span class="text-muted" style="font-size:0.7rem; flex-shrink:0;">{{ row.week_done | sum }}/{{
+                        row.habit.frequency_per_week }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -220,7 +228,8 @@
     <div class="col-12">
         <h5 class="fw-bold text-muted d-flex align-items-center gap-2 mb-2">
             <i class="bi bi-heart-pulse-fill text-danger"></i> Health & Wellness
-            <a href="{{ url_for('health.dashboard') }}" class="btn btn-sm btn-outline-secondary ms-auto">Open Health Hub →</a>
+            <a href="{{ url_for('health.dashboard') }}" class="btn btn-sm btn-outline-secondary ms-auto">Open Health Hub
+                →</a>
         </h5>
     </div>
 </div>
@@ -229,12 +238,13 @@
 <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center gap-3 mb-3 py-2 px-3">
     <i class="bi bi-exclamation-triangle-fill fs-5 text-warning"></i>
     <div class="small">
-        <strong>Active Health Issue:</strong> {{ health.active_issues[0].title }} ({{ health.active_issues[0].severity }})
+        <strong>Active Health Issue:</strong> {{ health.active_issues[0].title }} ({{ health.active_issues[0].severity
+        }})
         {% if health.active_issues[0].doctor_visited and health.active_issues[0].doctor_name %}
-            – Doctor: {{ health.active_issues[0].doctor_name }}
+        – Doctor: {{ health.active_issues[0].doctor_name }}
         {% endif %}
         {% if health.active_issues[0].follow_up_date %}
-            | Follow-up: {{ health.active_issues[0].follow_up_date.strftime('%b %d, %Y') }}
+        | Follow-up: {{ health.active_issues[0].follow_up_date.strftime('%b %d, %Y') }}
         {% endif %}
     </div>
     <a href="{{ url_for('health.dashboard', tab='issues') }}" class="btn btn-sm btn-warning ms-auto py-0">View</a>
@@ -251,11 +261,14 @@
                     <i class="bi bi-activity text-primary"></i>
                 </div>
                 <h4 class="fw-bold mb-1 text-primary">
-                    {{ health.workouts_done_days }} <span class="fs-6 fw-normal text-muted">/ {{ health.target_days }} days</span>
+                    {{ health.workouts_done_days }} <span class="fs-6 fw-normal text-muted">/ {{ health.target_days }}
+                        days</span>
                 </h4>
                 <div class="progress" style="height: 6px;">
-                    {% set ex_pct = ((health.workouts_done_days / health.target_days) * 100)|int if health.target_days > 0 else 0 %}
-                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ [ex_pct, 100]|min }}%;"></div>
+                    {% set ex_pct = ((health.workouts_done_days / health.target_days) * 100)|int if health.target_days >
+                    0 else 0 %}
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ [ex_pct, 100]|min }}%;">
+                    </div>
                 </div>
                 <p class="text-muted small mt-1 mb-0">{{ health.workouts_total_mins }} mins active</p>
             </div>
@@ -271,13 +284,17 @@
                     <i class="bi bi-fire text-warning"></i>
                 </div>
                 <h4 class="fw-bold mb-1 text-warning">
-                    {{ health.today_calories|int }} <span class="fs-6 fw-normal text-muted">/ {{ health.target_calories }} kcal</span>
+                    {{ health.today_calories|int }} <span class="fs-6 fw-normal text-muted">/ {{ health.target_calories
+                        }} kcal</span>
                 </h4>
                 <div class="progress" style="height: 6px;">
-                    {% set cal_pct = ((health.today_calories / health.target_calories) * 100)|int if health.target_calories > 0 else 0 %}
-                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ [cal_pct, 100]|min }}%;"></div>
+                    {% set cal_pct = ((health.today_calories / health.target_calories) * 100)|int if
+                    health.target_calories > 0 else 0 %}
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ [cal_pct, 100]|min }}%;">
+                    </div>
                 </div>
-                <p class="text-muted small mt-1 mb-0">{{ [0, (health.target_calories - health.today_calories|int)]|max }} kcal remaining</p>
+                <p class="text-muted small mt-1 mb-0">{{ [0, (health.target_calories - health.today_calories|int)]|max
+                    }} kcal remaining</p>
             </div>
         </div>
     </div>
@@ -291,11 +308,14 @@
                     <i class="bi bi-droplet-fill text-info"></i>
                 </div>
                 <h4 class="fw-bold mb-1 text-info">
-                    {{ health.today_water_ml // 250 }} <span class="fs-6 fw-normal text-muted">/ {{ health.target_water_ml // 250 }} glasses</span>
+                    {{ health.today_water_ml // 250 }} <span class="fs-6 fw-normal text-muted">/ {{
+                        health.target_water_ml // 250 }} glasses</span>
                 </h4>
                 <div class="progress" style="height: 6px;">
-                    {% set water_pct = ((health.today_water_ml / health.target_water_ml) * 100)|int if health.target_water_ml > 0 else 0 %}
-                    <div class="progress-bar bg-info" role="progressbar" style="width: {{ [water_pct, 100]|min }}%;"></div>
+                    {% set water_pct = ((health.today_water_ml / health.target_water_ml) * 100)|int if
+                    health.target_water_ml > 0 else 0 %}
+                    <div class="progress-bar bg-info" role="progressbar" style="width: {{ [water_pct, 100]|min }}%;">
+                    </div>
                 </div>
                 <p class="text-muted small mt-1 mb-0">{{ health.today_water_ml }} ml drank</p>
             </div>
@@ -316,7 +336,8 @@
                 </h4>
                 <div>
                     {% if health.latest_vital.bmi %}
-                    <span class="badge bg-{{ health.latest_vital.bmi_category.badge }}-subtle text-{{ health.latest_vital.bmi_category.badge }} small">
+                    <span
+                        class="badge bg-{{ health.latest_vital.bmi_category.badge }}-subtle text-{{ health.latest_vital.bmi_category.badge }} small">
                         BMI {{ health.latest_vital.bmi }} ({{ health.latest_vital.bmi_category.label }})
                     </span>
                     {% endif %}
@@ -335,7 +356,6 @@
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-
     const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
     const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
     const tickColor = isDark ? '#adb5bd' : '#6c757d';
@@ -410,7 +430,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // ── Habit Today Donut ───────────────────────────────────
     const donutCtx = document.getElementById('habitDonutChart');
     if (donutCtx) {
-        const done  = {{ habits.done_today }};
+        const done = {{ habits.done_today }};
         const total = {{ habits.total_active }};
         const remaining = Math.max(0, total - done);
         new Chart(donutCtx, {
